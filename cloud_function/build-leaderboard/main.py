@@ -12,6 +12,7 @@
 #      and PUBLIC (page bucket): index.html + chart.png (nicknames only)
 #   4. (optional) a featured fund, watched every 5 minutes during the trading day (live.py): live.png
 #      The featured NetID is one line in the PRIVATE bucket: config/featured.txt
+#   5. one public page per fund (fund_pages.py): funds/<hash>.html, linked from each nickname
 # HTTP entrypoint: build_http
 
 import io
@@ -26,6 +27,7 @@ import pandas as pd
 from google.cloud import storage
 
 import board as scoring
+import fund_pages
 import live
 import page
 
@@ -195,15 +197,27 @@ def build_http(request):
             blob = public_bucket.blob("live.png")
             blob.cache_control = "no-cache, max-age=0"
             blob.upload_from_string(featured["png"], content_type="image/png")
+            if featured["backtest_png"] is not None:
+                blob = public_bucket.blob("backtest.png")
+                blob.cache_control = "no-cache, max-age=0"
+                blob.upload_from_string(featured["backtest_png"], content_type="image/png")
 
         # public page
         updated = now_utc.astimezone(EASTERN).strftime("%a %b %d, %I:%M %p ET")
+
+        # one page per fund (click a nickname); never let it break the leaderboard
+        links = {}
+        try:
+            links = fund_pages.build(result, entries, prices, entries_bucket, public_bucket, read_text, write_text,
+                                     updated, EASTERN)
+        except Exception:
+            logging.warning("fund pages skipped: %s", traceback.format_exc())
         if len(result["board"]) > 0:
             chart = page.make_chart(result["values"], result["board"], result["benchmark_path"])
             blob = public_bucket.blob("chart.png")
             blob.cache_control = "no-cache, max-age=0"
             blob.upload_from_string(chart, content_type="image/png")
-        write_text(public_bucket, "index.html", page.render(result, updated, featured=featured), "text/html")
+        write_text(public_bucket, "index.html", page.render(result, updated, featured=featured, links=links), "text/html")
 
         summary = {"ok": True, "entries": len(entries), "funds_live": len(result["board"]),
                    "funds_waiting": len(result["pending"]), "last_close": result["last_close"],

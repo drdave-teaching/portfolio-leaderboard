@@ -29,11 +29,16 @@ th, td { padding:9px 10px; border-bottom:1px solid var(--line); text-align:right
 th { background:#eef2f7; font-weight:600; color:var(--muted); font-size:12.5px; }
 td.l, th.l { text-align:left; }
 td.fund { font-weight:600; }
+td.fund a { color:var(--navy); }
 td.theme { color:var(--muted); white-space:normal; min-width:140px; }
 .up { color:var(--up); } .down { color:var(--down); }
 img.chart { width:100%; background:white; border:1px solid var(--line); border-radius:10px; }
 .note { color:var(--muted); font-size:13.5px; line-height:1.5; }
 ul.how { line-height:1.6; }
+.tabs { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 12px; }
+.tab { border:1px solid var(--line); background:white; color:var(--ink); border-radius:999px; padding:7px 16px;
+       font-size:14px; cursor:pointer; font-family:inherit; }
+.tab.on { background:var(--navy); color:white; border-color:var(--navy); }
 """
 
 
@@ -93,7 +98,127 @@ def make_chart(values, board, benchmark_path):
     return buffer.getvalue()
 
 
-def render(result, updated_et, chart_name="chart.png", featured=None):
+def backtest_cell(value, money=False):
+    if value is None or value == "-" or (isinstance(value, float) and np.isnan(value)):
+        return "-"
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return html.escape(str(value))
+    if money:
+        return "$" + "{:,.0f}".format(number)
+    return "%.2f" % number if abs(number) < 10 else "%.1f" % number
+
+
+def backtest_block(backtest, image_src, window, nickname):
+    """The Studio 5 Part 4 backtest of one fund: a note, the chart (if any) and the table."""
+    out = []
+    if not isinstance(backtest, dict) or len(backtest) == 0:
+        out.append("<p class='note'>No backtest was sent with this fund.</p>")
+        return "".join(out)
+    window = window or ["", ""]
+    out.append("<p class='note'>From the Studio 5 notebook (Part 4). The model was fit on the data before the last "
+               "12 months, then each portfolio was held through those 12 months, which the model never saw. "
+               "Data window: %s to %s.</p>" % (html.escape(str(window[0])), html.escape(str(window[-1]))))
+    if image_src is not None:
+        out.append("<img class='chart' src='%s' alt='Backtest chart'>" % html.escape(image_src))
+    columns = []
+    for row_name in backtest:
+        if isinstance(backtest[row_name], dict):
+            for column in backtest[row_name]:
+                if column not in columns:
+                    columns.append(column)
+    out.append("<div class='tablebox'><table><tr><th class='l'>Portfolio</th>")
+    for column in columns:
+        out.append("<th>%s</th>" % html.escape(column))
+    out.append("</tr>")
+    for row_name in backtest:
+        if not isinstance(backtest[row_name], dict):
+            continue
+        label = row_name
+        if row_name == "with your rules":
+            label = "%s (with rules)" % nickname
+        out.append("<tr><td class='l fund'>%s</td>" % html.escape(label))
+        for column in columns:
+            out.append("<td>%s</td>" % backtest_cell(backtest[row_name].get(column), money=column.startswith("ending value")))
+        out.append("</tr>")
+    out.append("</table></div>")
+    out.append("<p class='note'>\"Promised average month\" is what the model expected from the data it was fit on; "
+               "\"average month\" is what actually happened in the year it never saw.</p>")
+    return "".join(out)
+
+
+def featured_section(featured):
+    """The featured fund in three tabs: Today, Holdings, Backtest (plain buttons, a few lines of script)."""
+    name = html.escape(featured["nickname"])
+    stamp = html.escape(featured["as_of"].replace(" ", ""))
+    out = []
+    out.append("<h2>%s · live</h2>" % name)
+    out.append("<div class='tabs'><button class='tab on' data-tab='today'>Today</button>"
+               "<button class='tab' data-tab='holdings'>What it holds</button>"
+               "<button class='tab' data-tab='backtest'>Backtest</button></div>")
+
+    # Today
+    out.append("<div class='pane' id='pane-today'>")
+    if featured["status"] != "live":
+        out.append("<p class='note'>%s</p>" % html.escape(featured["status"]))
+    today = featured["today_pct"]
+    out.append("<div class='cards'>")
+    out.append("<div class='card'><div class='big'>%s</div><div class='lab'>%s with its rules, today</div></div>" % (pct(today["with_rules"]), name))
+    out.append("<div class='card'><div class='big'>%s</div><div class='lab'>its no-rules twin, today</div></div>" % pct(today["no_rules"]))
+    out.append("<div class='card'><div class='big'>%s</div><div class='lab'>S&amp;P 500 (SPY), today</div></div>" % pct(today["spy"]))
+    if "with_rules" in featured["value_now"]:
+        out.append("<div class='card'><div class='big'>$%s</div><div class='lab'>its $10,000, right now</div></div>" %
+                   "{:,.0f}".format(featured["value_now"]["with_rules"]))
+    out.append("</div>")
+    out.append("<img class='chart' src='live.png?t=%s' alt='The featured fund today and since it started'>" % stamp)
+    out.append("<p class='note'>%s, prices as of %s, every 5 minutes while the market is open (Yahoo Finance; "
+               "they can run up to 15 minutes behind). \"Today\" is the change since the last close. "
+               "This is for watching: the leaderboard below is scored on daily closes.</p>" % (
+                   html.escape(featured["session_label"]), html.escape(featured["as_of"])))
+    out.append("</div>")
+
+    # What it holds
+    out.append("<div class='pane' id='pane-holdings' hidden>")
+    out.append("<div class='tablebox'><table><tr><th class='l'>Stock</th><th class='l'>Sector</th>"
+               "<th>Share with rules</th><th>Share, no-rules twin</th><th>Today</th><th>Added to the fund today</th></tr>")
+    for r in featured["holdings"]:
+        out.append("<tr><td class='l fund'>%s</td><td class='l theme'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (
+            html.escape(r["ticker"]), html.escape(str(r["sector"])),
+            share(r["with_rules_pct"]), share(r["no_rules_pct"]), pct(r["today_pct"]), points(r["contribution_pts"])))
+    out.append("</table></div>")
+    out.append("<p class='note'>\"Added to the fund today\" is the stock's share times its move, in percentage points; "
+               "they add up to the fund's day. Shares drift as prices move (buy and hold).</p>")
+    out.append("</div>")
+
+    # Backtest
+    out.append("<div class='pane' id='pane-backtest' hidden>")
+    out.append(backtest_block(featured.get("backtest"), "backtest.png?t=%s" % stamp if featured.get("backtest_png") is not None else None,
+                              featured.get("data_window"), featured["nickname"]))
+    out.append("</div>")
+
+    out.append("""<script>
+document.querySelectorAll('.tab').forEach(function (button) {
+  button.addEventListener('click', function () {
+    document.querySelectorAll('.tab').forEach(function (b) { b.classList.remove('on'); });
+    document.querySelectorAll('.pane').forEach(function (p) { p.hidden = true; });
+    button.classList.add('on');
+    document.getElementById('pane-' + button.dataset.tab).hidden = false;
+  });
+});
+</script>""")
+    return "".join(out)
+
+
+def fund_name(nickname, netid, links):
+    """The nickname, linked to the fund's own page when it has one."""
+    text = html.escape(str(nickname))
+    if links is not None and netid in links:
+        return "<a href='%s'>%s</a>" % (html.escape(links[netid]), text)
+    return text
+
+
+def render(result, updated_et, chart_name="chart.png", featured=None, links=None):
     board = result["board"]
     pending = result["pending"]
     out = []
@@ -125,33 +250,7 @@ def render(result, updated_et, chart_name="chart.png", featured=None):
     out.append("</div>")
 
     if featured is not None:
-        out.append("<h2>%s · live</h2>" % html.escape(featured["nickname"]))
-        if featured["status"] != "live":
-            out.append("<p class='note'>%s</p>" % html.escape(featured["status"]))
-        out.append("<div class='cards'>")
-        today = featured["today_pct"]
-        out.append("<div class='card'><div class='big'>%s</div><div class='lab'>%s with its rules, today</div></div>" % (
-            pct(today["with_rules"]), html.escape(featured["nickname"])))
-        out.append("<div class='card'><div class='big'>%s</div><div class='lab'>its no-rules twin, today</div></div>" % pct(today["no_rules"]))
-        out.append("<div class='card'><div class='big'>%s</div><div class='lab'>S&amp;P 500 (SPY), today</div></div>" % pct(today["spy"]))
-        if "with_rules" in featured["value_now"]:
-            out.append("<div class='card'><div class='big'>$%s</div><div class='lab'>its $10,000, right now</div></div>" %
-                       "{:,.0f}".format(featured["value_now"]["with_rules"]))
-        out.append("</div>")
-        out.append("<img class='chart' src='live.png?t=%s' alt='The featured fund today and since it started'>" % html.escape(featured["as_of"].replace(" ", "")))
-        out.append("<h2>What %s holds, and what moved it today</h2>" % html.escape(featured["nickname"]))
-        out.append("<div class='tablebox'><table><tr><th class='l'>Stock</th><th class='l'>Sector</th>"
-                   "<th>Share with rules</th><th>Share, no-rules twin</th><th>Today</th><th>Added to the fund today</th></tr>")
-        for r in featured["holdings"]:
-            out.append("<tr><td class='l fund'>%s</td><td class='l theme'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (
-                html.escape(r["ticker"]), html.escape(str(r["sector"])),
-                share(r["with_rules_pct"]), share(r["no_rules_pct"]), pct(r["today_pct"]), points(r["contribution_pts"])))
-        out.append("</table></div>")
-        out.append("<p class='note'>%s, prices as of %s, every 5 minutes while the market is open (Yahoo Finance; "
-                   "they can run up to 15 minutes behind). \"Today\" is the change since the last close. "
-                   "\"Added to the fund today\" is the stock's share times its move, in percentage points; they add up to the fund's day. "
-                   "Shares drift as prices move (buy and hold). This is for watching: the leaderboard below is scored on daily closes.</p>" % (
-                       html.escape(featured["session_label"]), html.escape(featured["as_of"])))
+        out.append(featured_section(featured))
 
     if n_live > 0:
         out.append("<h2>The leaderboard (ranked by your fund: the portfolio with your rules)</h2>")
@@ -162,7 +261,7 @@ def render(result, updated_et, chart_name="chart.png", featured=None):
             r = board.loc[i]
             out.append("<tr><td>%d</td><td class='l fund'>%s</td><td class='l theme'>%s</td><td>$%s</td><td>%s</td>"
                        "<td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>" % (
-                           r["rank"], html.escape(str(r["nickname"])), html.escape(str(r["theme"])),
+                           r["rank"], fund_name(r["nickname"], r["netid"], links), html.escape(str(r["theme"])),
                            "{:,.0f}".format(r["with_rules_value"]), pct(r["with_rules_growth_pct"]),
                            pct(r["no_rules_growth_pct"]), points(r["rules_minus_no_rules_pct"]),
                            points(r["rules_minus_spy_pct"]), plain_pct(r["with_rules_worst_drop_pct"]),
@@ -179,7 +278,7 @@ def render(result, updated_et, chart_name="chart.png", featured=None):
         for i in range(len(pending)):
             r = pending.loc[i]
             out.append("<tr><td class='l fund'>%s</td><td class='l theme'>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>" % (
-                html.escape(str(r["nickname"])), html.escape(str(r["theme"])), r["stocks_with_rules"],
+                fund_name(r["nickname"], r["netid"], links), html.escape(str(r["theme"])), r["stocks_with_rules"],
                 r["stocks_no_rules"], html.escape(str(r["starts"]))))
         out.append("</table></div>")
 
@@ -188,6 +287,7 @@ def render(result, updated_et, chart_name="chart.png", featured=None):
 
     out.append("<h2>How it works</h2><ul class='how'>"
                "<li>Each entry has two portfolios from the Studio 5 model: <b>with your rules</b> (your fund, ranked here) and its <b>no-rules twin</b>.</li>"
+               "<li>Click a fund's name to see its own page: its value since it started, its Studio 5 backtest and its history.</li>"
                "<li>Both start with $10,000 at the first market close after you submit, and are held until you change them.</li>"
                "<li>You can change your portfolio as often as you like by re-running the cell. A change counts from the next close, "
                "and starts from what your fund was worth that day. Every change is kept.</li>"

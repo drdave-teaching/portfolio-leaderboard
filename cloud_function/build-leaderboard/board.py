@@ -159,6 +159,7 @@ def build_board(submissions, prices, allowed_netids=None):
 
         days = sorted(segments)
         row = dict(base)
+        row["changes"] = len(days) - 1
         row["started"] = days[0].strftime("%Y-%m-%d")
         row["trading_days"] = len(prices.loc[days[0]:])
         cash_all = set()
