@@ -223,6 +223,24 @@ def featured(netid, entries, prices, result, bucket, now_utc, eastern, read_text
         else:
             status = "It started at the close on %s, so today shows how its stocks moved that day." % first.strftime("%a %b %d")
 
+    # what it holds, and what each stock did to it today (contribution = share x move, in percentage points)
+    sectors = mine[-1].get("sectors", {})
+    holding_rows = []
+    for ticker in sorted(set(holdings["with_rules"]) | set(holdings["no_rules"])):
+        move = np.nan
+        if ticker in bars.columns and ticker in previous and bars[ticker].notna().any():
+            move = 100 * (bars[ticker].ffill().iloc[-1] / previous[ticker] - 1)
+        ruled_share = holdings["with_rules"].get(ticker, 0.0)
+        holding_rows.append({
+            "ticker": ticker,
+            "sector": sectors.get(ticker, ""),
+            "with_rules_pct": 100 * ruled_share,
+            "no_rules_pct": 100 * holdings["no_rules"].get(ticker, 0.0),
+            "today_pct": move,
+            "contribution_pts": ruled_share * move if ruled_share > 0 else np.nan,
+        })
+    holding_rows = sorted(holding_rows, key=lambda r: (-r["with_rules_pct"], -r["no_rules_pct"]))
+
     png = make_live_chart(today, since, spy_since, value_now, session_day, latest, nickname, eastern)
     return {
         "nickname": nickname,
@@ -231,6 +249,7 @@ def featured(netid, entries, prices, result, bucket, now_utc, eastern, read_text
         "as_of": latest.strftime("%I:%M %p ET").lstrip("0"),
         "today_pct": {k: round(float(today[k].iloc[-1]), 2) for k in today},
         "value_now": {k: round(v, 2) for k, v in value_now.items()},
+        "holdings": holding_rows,
         "png": png,
     }
 

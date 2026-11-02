@@ -51,6 +51,12 @@ def plain_pct(value):
     return "%.2f%%" % value
 
 
+def share(value):
+    if value is None or (isinstance(value, float) and np.isnan(value)) or value < 0.05:
+        return "-"
+    return "%.1f%%" % value
+
+
 def points(value):
     if value is None or (isinstance(value, float) and np.isnan(value)):
         return "-"
@@ -133,9 +139,18 @@ def render(result, updated_et, chart_name="chart.png", featured=None):
                        "{:,.0f}".format(featured["value_now"]["with_rules"]))
         out.append("</div>")
         out.append("<img class='chart' src='live.png?t=%s' alt='The featured fund today and since it started'>" % html.escape(featured["as_of"].replace(" ", "")))
+        out.append("<h2>What %s holds, and what moved it today</h2>" % html.escape(featured["nickname"]))
+        out.append("<div class='tablebox'><table><tr><th class='l'>Stock</th><th class='l'>Sector</th>"
+                   "<th>Share with rules</th><th>Share, no-rules twin</th><th>Today</th><th>Added to the fund today</th></tr>")
+        for r in featured["holdings"]:
+            out.append("<tr><td class='l fund'>%s</td><td class='l theme'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (
+                html.escape(r["ticker"]), html.escape(str(r["sector"])),
+                share(r["with_rules_pct"]), share(r["no_rules_pct"]), pct(r["today_pct"]), points(r["contribution_pts"])))
+        out.append("</table></div>")
         out.append("<p class='note'>%s, prices as of %s, every 5 minutes while the market is open (Yahoo Finance; "
                    "they can run up to 15 minutes behind). \"Today\" is the change since the last close. "
-                   "This is for watching: the leaderboard below is scored on daily closes.</p>" % (
+                   "\"Added to the fund today\" is the stock's share times its move, in percentage points; they add up to the fund's day. "
+                   "Shares drift as prices move (buy and hold). This is for watching: the leaderboard below is scored on daily closes.</p>" % (
                        html.escape(featured["session_label"]), html.escape(featured["as_of"])))
 
     if n_live > 0:
