@@ -102,12 +102,17 @@ def get_prices(bucket, tickers, first_entry_utc, now_utc):
     if state_text is not None:
         state = json.loads(state_text)
 
+    # during the trading day Yahoo returns today's price so far as today's row: it is not a close, so drop it
+    last_close = latest_expected_close(now_utc)
+    if cached is not None:
+        cached = cached[cached.index <= last_close]
+
     start_day = pd.Timestamp(first_entry_utc).tz_localize(None).normalize() - pd.Timedelta(days=PRICE_HISTORY_DAYS)
     needed = set(tickers)
     stale = cached is None
     if cached is not None:
         missing = needed - set(cached.columns)
-        if len(missing) > 0 or cached.index.max() < latest_expected_close(now_utc) or cached.index.min() > start_day:
+        if len(missing) > 0 or cached.index.max() < last_close or cached.index.min() > start_day:
             stale = True
     recently = False
     if "fetched_utc" in state:
@@ -120,6 +125,8 @@ def get_prices(bucket, tickers, first_entry_utc, now_utc):
         except Exception:
             logging.warning("price download failed: %s", traceback.format_exc())
             fresh = None
+        if fresh is not None:
+            fresh = fresh[fresh.index <= last_close]
         write_text(bucket, FETCH_STATE_KEY, json.dumps({"fetched_utc": now_utc.isoformat(), "tickers": sorted(needed),
                                                         "ok": fresh is not None}), "application/json")
         if fresh is not None and len(fresh) > 0:
