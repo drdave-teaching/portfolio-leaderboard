@@ -14,6 +14,7 @@ INVOKER_SA="leaderboard-invoker@${PROJECT_ID}.iam.gserviceaccount.com"
 gcloud config set project "${PROJECT_ID}"
 PROJECT_NUMBER=$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)')
 
+# (the job keeps its old name build-leaderboard-15min; it runs every 5 minutes)
 # 1. Services
 gcloud services enable cloudfunctions.googleapis.com run.googleapis.com cloudbuild.googleapis.com \
   artifactregistry.googleapis.com cloudscheduler.googleapis.com storage.googleapis.com logging.googleapis.com \
@@ -51,7 +52,7 @@ gcloud functions deploy submit-portfolio --gen2 --region="${REGION}" --runtime=p
   --memory=256Mi --timeout=60 --max-instances=10 --quiet \
   && echo "✅ 5. submit-portfolio deployed"
 
-# 6. The builder (private), started every 15 minutes
+# 6. The builder (private), started every 5 minutes
 gcloud functions deploy build-leaderboard --gen2 --region="${REGION}" --runtime=python312 \
   --source="${HOME}/portfolio-leaderboard/cloud_function/build-leaderboard" --entry-point=build_http \
   --trigger-http --no-allow-unauthenticated --service-account="${APP_SA}" \
@@ -65,14 +66,14 @@ gcloud iam service-accounts add-iam-policy-binding "${INVOKER_SA}" \
   --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-cloudscheduler.iam.gserviceaccount.com" \
   --role="roles/iam.serviceAccountTokenCreator" >/dev/null 2>&1 || true
 URL=$(gcloud functions describe build-leaderboard --gen2 --region="${REGION}" --format='value(serviceConfig.uri)')
-gcloud scheduler jobs create http build-leaderboard-15min --location="${REGION}" --schedule="*/15 * * * *" \
+gcloud scheduler jobs create http build-leaderboard-15min --location="${REGION}" --schedule="*/5 * * * *" \
   --time-zone="America/New_York" --uri="${URL}" --http-method=POST \
   --oidc-service-account-email="${INVOKER_SA}" --oidc-token-audience="${URL}" >/dev/null 2>&1 \
-|| gcloud scheduler jobs update http build-leaderboard-15min --location="${REGION}" --schedule="*/15 * * * *" \
+|| gcloud scheduler jobs update http build-leaderboard-15min --location="${REGION}" --schedule="*/5 * * * *" \
   --time-zone="America/New_York" --uri="${URL}" --http-method=POST \
   --oidc-service-account-email="${INVOKER_SA}" --oidc-token-audience="${URL}" >/dev/null
 gcloud scheduler jobs run build-leaderboard-15min --location="${REGION}" >/dev/null 2>&1 || true
-echo "✅ 7. the page rebuilds every 15 minutes"
+echo "✅ 7. the page rebuilds every 5 minutes"
 
 echo
 echo "Gatekeeper (goes in the Studio 5 notebook):  $(gcloud functions describe submit-portfolio --gen2 --region=${REGION} --format='value(url)')"

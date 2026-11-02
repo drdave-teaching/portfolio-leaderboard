@@ -11,7 +11,7 @@ Studio 5 notebook (Part 5)                 your project: opim5641-portfolio-f26
                                               │ saves a NEW file, never overwrites
                                               ▼
                                    gs://opim5641-portfolio-f26/submissions/<netid>/<time>.json   (private)
-                                              │ every 15 minutes
+                                              │ every 5 minutes
                                               ▼
                                    build-leaderboard  ── prices (Yahoo, cached) ── scores every fund
                                      private: class/leaderboard_private.csv, class/daily_values.csv, class/entries_log.csv
@@ -24,6 +24,9 @@ Studio 5 notebook (Part 5)                 your project: opim5641-portfolio-f26
 - Each portfolio is held (buy and hold) until the student changes it. Changes are unlimited and logged; a change
   starts from what the fund was worth that day, so the value line continues.
 - A ticker with no price is held as cash and listed in the private table (`no_price_tickers`).
+- A **featured fund** (Dr. Dave's) gets a live panel: its move today vs the S&P 500 from 5-minute prices, and its
+  value since it started. Watching only; the ranks use daily closes. The NetID is set in the private bucket
+  (`config/featured.txt`), not in this repo.
 - The page ranks by the fund **with rules** and shows the no-rules twin, the S&P 500 (SPY) over the same days, the
   worst drop and the number of changes. Nicknames only.
 

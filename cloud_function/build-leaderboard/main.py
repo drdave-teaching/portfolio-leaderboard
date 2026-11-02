@@ -1,6 +1,6 @@
 # build-leaderboard: Dr. Dave's class leaderboard for the OPIM 5641 portfolios (Studio 5, Studio 6, final project).
 #
-# Every 15 minutes (Cloud Scheduler) this function:
+# Every 5 minutes (Cloud Scheduler) this function:
 #   1. reads every entry the gatekeeper saved:   gs://<entries bucket>/submissions/<netid>/*.json
 #      (optional) a roster:                       gs://<entries bucket>/roster/allowed_netids.csv  (one column: netid)
 #   2. keeps a cache of daily closing prices:     gs://<entries bucket>/prices/daily_closes.csv
@@ -10,6 +10,8 @@
 #        class/daily_values.csv          every fund's value every day (netid, date, portfolio, value)
 #        class/entries_log.csv           every entry ever made: when, which close it counts from, the reason
 #      and PUBLIC (page bucket): index.html + chart.png (nicknames only)
+#   4. (optional) a featured fund, watched every 5 minutes during the trading day (live.py): live.png
+#      The featured NetID is one line in the PRIVATE bucket: config/featured.txt
 # HTTP entrypoint: build_http
 
 import io
@@ -24,6 +26,7 @@ import pandas as pd
 from google.cloud import storage
 
 import board as scoring
+import live
 import page
 
 ENTRIES_BUCKET = os.getenv("ENTRIES_BUCKET", "")
@@ -179,6 +182,20 @@ def build_http(request):
         write_text(entries_bucket, "class/daily_values.csv", result["values"].to_csv(index=False), "text/csv")
         write_text(entries_bucket, "class/entries_log.csv", result["log"].to_csv(index=False), "text/csv")
 
+        # the featured fund (watching only, never part of the scoring)
+        featured = None
+        featured_text = read_text(entries_bucket, live.FEATURED_KEY)
+        if featured_text is not None and featured_text.strip() != "" and len(prices) > 0:
+            try:
+                featured = live.featured(featured_text.strip().lower(), entries, prices, result, entries_bucket,
+                                         now_utc, EASTERN, read_text, write_text)
+            except Exception:
+                logging.warning("featured fund skipped: %s", traceback.format_exc())
+        if featured is not None:
+            blob = public_bucket.blob("live.png")
+            blob.cache_control = "no-cache, max-age=0"
+            blob.upload_from_string(featured["png"], content_type="image/png")
+
         # public page
         updated = now_utc.astimezone(EASTERN).strftime("%a %b %d, %I:%M %p ET")
         if len(result["board"]) > 0:
@@ -186,10 +203,11 @@ def build_http(request):
             blob = public_bucket.blob("chart.png")
             blob.cache_control = "no-cache, max-age=0"
             blob.upload_from_string(chart, content_type="image/png")
-        write_text(public_bucket, "index.html", page.render(result, updated), "text/html")
+        write_text(public_bucket, "index.html", page.render(result, updated, featured=featured), "text/html")
 
         summary = {"ok": True, "entries": len(entries), "funds_live": len(result["board"]),
-                   "funds_waiting": len(result["pending"]), "last_close": result["last_close"]}
+                   "funds_waiting": len(result["pending"]), "last_close": result["last_close"],
+                   "featured": None if featured is None else featured["as_of"]}
         logging.info("built: %s", summary)
         return (json.dumps(summary), 200, {"Content-Type": "application/json"})
     except Exception:

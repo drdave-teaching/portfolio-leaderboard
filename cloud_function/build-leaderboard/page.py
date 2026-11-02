@@ -87,7 +87,7 @@ def make_chart(values, board, benchmark_path):
     return buffer.getvalue()
 
 
-def render(result, updated_et, chart_name="chart.png"):
+def render(result, updated_et, chart_name="chart.png", featured=None):
     board = result["board"]
     pending = result["pending"]
     out = []
@@ -117,6 +117,26 @@ def render(result, updated_et, chart_name="chart.png"):
         out.append("<div class='card'><div class='big'>%d of %d</div><div class='lab'>funds ahead of the S&amp;P 500</div></div>" % (beat_spy, n_live))
         out.append("<div class='card'><div class='big'>%d of %d</div><div class='lab'>funds where the rules beat no rules</div></div>" % (rules_won, n_live))
     out.append("</div>")
+
+    if featured is not None:
+        out.append("<h2>%s · live</h2>" % html.escape(featured["nickname"]))
+        if featured["status"] != "live":
+            out.append("<p class='note'>%s</p>" % html.escape(featured["status"]))
+        out.append("<div class='cards'>")
+        today = featured["today_pct"]
+        out.append("<div class='card'><div class='big'>%s</div><div class='lab'>%s with its rules, today</div></div>" % (
+            pct(today["with_rules"]), html.escape(featured["nickname"])))
+        out.append("<div class='card'><div class='big'>%s</div><div class='lab'>its no-rules twin, today</div></div>" % pct(today["no_rules"]))
+        out.append("<div class='card'><div class='big'>%s</div><div class='lab'>S&amp;P 500 (SPY), today</div></div>" % pct(today["spy"]))
+        if "with_rules" in featured["value_now"]:
+            out.append("<div class='card'><div class='big'>$%s</div><div class='lab'>its $10,000, right now</div></div>" %
+                       "{:,.0f}".format(featured["value_now"]["with_rules"]))
+        out.append("</div>")
+        out.append("<img class='chart' src='live.png?t=%s' alt='The featured fund today and since it started'>" % html.escape(featured["as_of"].replace(" ", "")))
+        out.append("<p class='note'>%s, prices as of %s, every 5 minutes while the market is open (Yahoo Finance; "
+                   "they can run up to 15 minutes behind). \"Today\" is the change since the last close. "
+                   "This is for watching: the leaderboard below is scored on daily closes.</p>" % (
+                       html.escape(featured["session_label"]), html.escape(featured["as_of"])))
 
     if n_live > 0:
         out.append("<h2>The leaderboard (ranked by your fund: the portfolio with your rules)</h2>")
@@ -149,14 +169,14 @@ def render(result, updated_et, chart_name="chart.png"):
         out.append("</table></div>")
 
     if n_live == 0 and n_wait == 0:
-        out.append("<p class='note'>No funds yet. Entries from the Studio 5 notebook show up here within 15 minutes.</p>")
+        out.append("<p class='note'>No funds yet. Entries from the Studio 5 notebook show up here within 5 minutes.</p>")
 
     out.append("<h2>How it works</h2><ul class='how'>"
                "<li>Each entry has two portfolios from the Studio 5 model: <b>with your rules</b> (your fund, ranked here) and its <b>no-rules twin</b>.</li>"
                "<li>Both start with $10,000 at the first market close after you submit, and are held until you change them.</li>"
                "<li>You can change your portfolio as often as you like by re-running the cell. A change counts from the next close, "
                "and starts from what your fund was worth that day. Every change is kept.</li>"
-               "<li>Prices are daily closing prices, adjusted for splits and dividends. The page updates every 15 minutes; "
-               "the numbers move once a day, after the close.</li></ul>")
+               "<li>Prices are daily closing prices, adjusted for splits and dividends. The page updates every 5 minutes; "
+               "the leaderboard numbers move once a day, after the close.</li></ul>")
     out.append("</div></body></html>")
     return "".join(out)
