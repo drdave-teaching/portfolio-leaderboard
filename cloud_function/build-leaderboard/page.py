@@ -62,6 +62,14 @@ def share(value):
     return "%.1f%%" % value
 
 
+def money_diff(value):
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return "-"
+    css = "up" if value > 0 else ("down" if value < 0 else "")
+    sign = "+" if value >= 0 else "-"
+    return '<span class="%s">%s$%s</span>' % (css, sign, "{:,.0f}".format(abs(value)))
+
+
 def points(value):
     if value is None or (isinstance(value, float) and np.isnan(value)):
         return "-"
@@ -218,7 +226,7 @@ def fund_name(nickname, netid, links):
     return text
 
 
-def render(result, updated_et, chart_name="chart.png", featured=None, links=None):
+def render(result, updated_et, chart_name="chart.png", featured=None, links=None, backtests=None):
     board = result["board"]
     pending = result["pending"]
     out = []
@@ -280,6 +288,25 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
             out.append("<tr><td class='l fund'>%s</td><td class='l theme'>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>" % (
                 fund_name(r["nickname"], r["netid"], links), html.escape(str(r["theme"])), r["stocks_with_rules"],
                 r["stocks_no_rules"], html.escape(str(r["starts"]))))
+        out.append("</table></div>")
+
+    if backtests is not None and len(backtests) > 0:
+        out.append("<h2>Best backtests (Studio 5, Part 4)</h2>")
+        out.append("<p class='note'>Each fund's model was fit without its last 12 months of data, then held through those 12 "
+                   "months. These are the years the models never saw: a fair test, but the past, not the race above.</p>")
+        out.append("<img class='chart' src='backtests.png?t=%s' alt='Every fund backtest'>" % html.escape(updated_et.replace(" ", "")))
+        out.append("<div class='tablebox'><table><tr><th>Rank</th><th class='l'>Fund</th><th class='l'>Theme</th>"
+                   "<th>$10,000 became (with rules)</th><th>Its no-rules twin</th><th>S&amp;P 500, same year</th>"
+                   "<th>Beat the S&amp;P 500 by</th><th>Worst drop</th><th>Test year ended</th></tr>")
+        for k in range(len(backtests)):
+            r = backtests[k]
+            beat = r["with_rules"] - r["spy"]
+            out.append("<tr><td>%d</td><td class='l fund'>%s</td><td class='l theme'>%s</td><td>%s</td><td>%s</td><td>%s</td>"
+                       "<td>%s</td><td>%s</td><td>%s</td></tr>" % (
+                           k + 1, fund_name(r["nickname"], r["netid"], links), html.escape(str(r["theme"])),
+                           backtest_cell(r["with_rules"], money=True), backtest_cell(r["no_rules"], money=True),
+                           backtest_cell(r["spy"], money=True), money_diff(beat), plain_pct(r["worst_drop"]),
+                           html.escape(str(r["window"][-1]))))
         out.append("</table></div>")
 
     if n_live == 0 and n_wait == 0:

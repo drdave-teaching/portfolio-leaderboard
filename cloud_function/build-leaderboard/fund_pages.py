@@ -170,3 +170,70 @@ def build(result, entries, prices, entries_bucket, public_bucket, read_text, wri
 
     write_text(entries_bucket, STATE_KEY, json.dumps(state), "application/json")
     return links
+
+
+def number(value):
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return float("nan")
+    return out
+
+
+def backtest_board(result, entries):
+    """Every fund's Studio 5 backtest, best first, and one chart of all their with-rules backtest lines."""
+    keep = set(result["board"]["netid"]) if len(result["board"]) > 0 else set()
+    if len(result["pending"]) > 0:
+        keep = keep | set(result["pending"]["netid"])
+    latest = {}
+    for entry in entries:
+        netid = entry.get("netid")
+        if netid in keep and (netid not in latest or entry["received_utc"] > latest[netid]["received_utc"]):
+            latest[netid] = entry
+    rows = []
+    lines = {}
+    spy_line = None
+    for netid in latest:
+        entry = latest[netid]
+        backtest = entry.get("backtest")
+        if not isinstance(backtest, dict) or not isinstance(backtest.get("with your rules"), dict):
+            continue
+        ruled = backtest.get("with your rules", {})
+        free = backtest.get("no rules", {})
+        spy = backtest.get("S&P 500 (SPY)", {}) if isinstance(backtest.get("S&P 500 (SPY)"), dict) else {}
+        rows.append({"netid": netid, "nickname": entry.get("nickname", ""), "theme": entry.get("theme", ""),
+                     "with_rules": number(ruled.get("ending value ($)")), "no_rules": number(free.get("ending value ($)")),
+                     "spy": number(spy.get("ending value ($)")), "worst_drop": number(ruled.get("worst drop (%)")),
+                     "window": entry.get("data_window") or ["", ""]})
+        paths = entry.get("backtest_paths")
+        if isinstance(paths, dict) and isinstance(paths.get("with your rules"), dict):
+            lines[entry.get("nickname", netid)] = paths["with your rules"]
+            if spy_line is None and isinstance(paths.get("S&P 500 (SPY)"), dict):
+                spy_line = paths["S&P 500 (SPY)"]
+    rows = sorted(rows, key=lambda r: -r["with_rules"] if r["with_rules"] == r["with_rules"] else 0)
+    png = None
+    if len(lines) > 0:
+        figure = plt.figure(figsize=(11, 4.8), dpi=110)
+        axis = figure.add_subplot(111)
+        for name in lines:
+            line = pd.Series(lines[name])
+            line.index = pd.to_datetime(line.index)
+            line = line.sort_index()
+            axis.plot(line.index, line.values, linewidth=1.6, alpha=0.85, marker="o", markersize=3, label=name)
+        if spy_line is not None:
+            line = pd.Series(spy_line)
+            line.index = pd.to_datetime(line.index)
+            line = line.sort_index()
+            axis.plot(line.index, line.values, color="black", linewidth=3, label="S&P 500 (SPY)")
+        axis.axhline(10000, color="#bbbbbb", linestyle="--", linewidth=1)
+        axis.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(live.dollars))
+        axis.set_title("Every fund's backtest (with its rules): $10,000 through the year its model never saw")
+        axis.grid(alpha=0.25)
+        if len(lines) <= 24:
+            axis.legend(loc="center left", bbox_to_anchor=(1.01, 0.5), fontsize=8, frameon=False)
+        figure.tight_layout()
+        buffer = io.BytesIO()
+        figure.savefig(buffer, format="png")
+        plt.close(figure)
+        png = buffer.getvalue()
+    return rows, png

@@ -9,6 +9,7 @@
 # overwrites anything, so every change a student makes is kept with its time and reason.
 # HTTP entrypoint: submit_http
 
+import hashlib
 import json
 import logging
 import os
@@ -157,9 +158,31 @@ def submit_http(request):
         "ok": True,
         "netid": cleaned["netid"],
         "nickname": cleaned["nickname"],
+        "theme": cleaned["theme"],
+        "reason": cleaned["reason"],
         "received_utc": cleaned["received_utc"],
         "google_email": email,
+        "submission_id": key,
         "holdings": {"no_rules": len(cleaned["portfolios"]["no_rules"]), "with_rules": len(cleaned["portfolios"]["with_rules"])},
+        "portfolios": cleaned["portfolios"],
+        "risk_limit": cleaned.get("risk_limit"),
+        "rules": cleaned.get("rules"),
+        "data_window": cleaned.get("data_window"),
+        "backtest_has_lines": isinstance(cleaned.get("backtest_paths"), dict),
         "counts_from": "the next market close after %s" % cleaned["received_utc"],
         "board": BOARD_URL,
+        "fund_page": fund_page_url(cleaned["netid"]),
     })
+
+
+def fund_page_url(netid):
+    """The fund's own page on the leaderboard (same address the builder uses), or '' before the builder has run."""
+    try:
+        salt_blob = storage.Client().bucket(ENTRIES_BUCKET).blob("config/salt.txt")
+        if not salt_blob.exists():
+            return ""
+        salt = salt_blob.download_as_text().strip()
+    except Exception:
+        return ""
+    slug = hashlib.sha256((salt + netid).encode("utf-8")).hexdigest()[:12]
+    return BOARD_URL.rsplit("/", 1)[0] + "/funds/%s.html" % slug
