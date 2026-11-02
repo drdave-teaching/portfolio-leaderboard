@@ -244,7 +244,7 @@ def featured(netid, entries, prices, result, bucket, now_utc, eastern, read_text
     png = make_live_chart(today, since, spy_since, value_now, session_day, latest, nickname, eastern)
     backtest_png = None
     if isinstance(mine[-1].get("backtest_paths"), dict) and len(mine[-1]["backtest_paths"]) > 0:
-        backtest_png = make_backtest_chart(mine[-1]["backtest_paths"], nickname)
+        backtest_png = make_backtest_chart(mine[-1]["backtest_paths"], nickname, mine[-1].get("backtest_title"))
     return {
         "nickname": nickname,
         "status": status,
@@ -257,6 +257,7 @@ def featured(netid, entries, prices, result, bucket, now_utc, eastern, read_text
         "backtest": mine[-1].get("backtest") if isinstance(mine[-1].get("backtest"), dict) else None,
         "backtest_png": backtest_png,
         "data_window": mine[-1].get("data_window"),
+        "backtest_note": mine[-1].get("backtest_note"),
     }
 
 
@@ -319,7 +320,7 @@ def make_live_chart(today, since, spy_since, value_now, session_day, latest, nic
     return buffer.getvalue()
 
 
-def make_backtest_chart(backtest_paths, nickname):
+def make_backtest_chart(backtest_paths, nickname, title=None):
     """The Studio 5 Part 4 backtest: $10,000 held through the year the model never saw."""
     colors = {"no rules": COLORS["no_rules"], "with your rules": COLORS["with_rules"],
               "equal split of your stocks": "#3b7dd8", "S&P 500 (SPY)": "black"}
@@ -337,7 +338,9 @@ def make_backtest_chart(backtest_paths, nickname):
                   color=colors.get(name, None), label=label)
     axis.axhline(10000, color="#bbbbbb", linestyle="--", linewidth=1)
     axis.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(dollars))
-    axis.set_title("Backtest: $10,000 held through the 12 months the model never saw")
+    if title is None:
+        title = "Backtest: $10,000 held through the 12 months the model never saw"
+    axis.set_title(title.replace("$", "\\$"))
     axis.grid(alpha=0.25)
     axis.legend(fontsize=9, frameon=False, loc="best")
     figure.tight_layout()

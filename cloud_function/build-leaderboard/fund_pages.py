@@ -73,7 +73,8 @@ def value_chart(netid, nickname, values, prices):
     return buffer.getvalue()
 
 
-def page_html(nickname, theme, row, waiting_label, history, has_value_png, backtest, has_backtest_png, window, updated):
+def page_html(nickname, theme, row, waiting_label, history, has_value_png, backtest, has_backtest_png, window, updated,
+              backtest_note=None):
     out = []
     out.append("<!doctype html><html lang='en'><head><meta charset='utf-8'>")
     out.append("<meta name='viewport' content='width=device-width, initial-scale=1'>")
@@ -96,7 +97,7 @@ def page_html(nickname, theme, row, waiting_label, history, has_value_png, backt
         out.append("<p class='note'>This fund starts at the close on %s. Its line shows up here after that close.</p>" %
                    html.escape(waiting_label))
     out.append("<h2>Its backtest</h2>")
-    out.append(page.backtest_block(backtest, has_backtest_png, window, nickname))
+    out.append(page.backtest_block(backtest, has_backtest_png, window, nickname, backtest_note))
     out.append("<h2>Its history</h2><div class='tablebox'><table><tr><th class='l'>Received</th><th class='l'>Counts from the close on</th><th class='l'>Why</th></tr>")
     for item in history:
         out.append("<tr><td class='l'>%s</td><td class='l'>%s</td><td class='l theme'>%s</td></tr>" % (
@@ -144,7 +145,7 @@ def build(result, entries, prices, entries_bucket, public_bucket, read_text, wri
         if isinstance(paths, dict) and len(paths) > 0:
             backtest_src = "%s_backtest.png?v=%s" % (slug, hashlib.sha256(str(mark).encode()).hexdigest()[:8])
             if before.get("backtest_for") != mark:
-                upload(public_bucket, "funds/%s_backtest.png" % slug, live.make_backtest_chart(paths, nickname), "image/png")
+                upload(public_bucket, "funds/%s_backtest.png" % slug, live.make_backtest_chart(paths, nickname, latest.get("backtest_title")), "image/png")
         value_src = None
         if netid in rows:
             value_src = "%s_value.png?v=%s" % (slug, last_close)
@@ -160,11 +161,12 @@ def build(result, entries, prices, entries_bucket, public_bucket, read_text, wri
                             "reason": str(entry.get("reason", ""))})
 
         body = page_html(nickname, latest.get("theme", ""), rows.get(netid), waiting.get(netid, ""), history, value_src,
-                         latest.get("backtest"), backtest_src, latest.get("data_window"), "")
+                         latest.get("backtest"), backtest_src, latest.get("data_window"), "", latest.get("backtest_note"))
         digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
         if before.get("page") != digest:
             full = page_html(nickname, latest.get("theme", ""), rows.get(netid), waiting.get(netid, ""), history, value_src,
-                             latest.get("backtest"), backtest_src, latest.get("data_window"), updated)
+                             latest.get("backtest"), backtest_src, latest.get("data_window"), updated,
+                             latest.get("backtest_note"))
             upload(public_bucket, "funds/%s.html" % slug, full, "text/html")
         state[netid] = {"backtest_for": mark, "value_for": "%s|%s" % (mark, last_close), "page": digest}
 
@@ -204,7 +206,8 @@ def backtest_board(result, entries):
         rows.append({"netid": netid, "nickname": entry.get("nickname", ""), "theme": entry.get("theme", ""),
                      "with_rules": number(ruled.get("ending value ($)")), "no_rules": number(free.get("ending value ($)")),
                      "spy": number(spy.get("ending value ($)")), "worst_drop": number(ruled.get("worst drop (%)")),
-                     "window": entry.get("data_window") or ["", ""]})
+                     "window": entry.get("data_window") or ["", ""],
+                     "kind": "Studio 6 (2026 so far)" if entry.get("notebook") == "studio6" else "Studio 5 (12 months it never saw)"})
         paths = entry.get("backtest_paths")
         if isinstance(paths, dict) and isinstance(paths.get("with your rules"), dict):
             lines[entry.get("nickname", netid)] = paths["with your rules"]
@@ -227,7 +230,7 @@ def backtest_board(result, entries):
             axis.plot(line.index, line.values, color="black", linewidth=3, label="S&P 500 (SPY)")
         axis.axhline(10000, color="#bbbbbb", linestyle="--", linewidth=1)
         axis.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(live.dollars))
-        axis.set_title("Every fund's backtest (with its rules): $10,000 through the year its model never saw")
+        axis.set_title("Every fund's latest backtest (with its rules): value of \\$10,000")
         axis.grid(alpha=0.25)
         if len(lines) <= 24:
             axis.legend(loc="center left", bbox_to_anchor=(1.01, 0.5), fontsize=8, frameon=False)

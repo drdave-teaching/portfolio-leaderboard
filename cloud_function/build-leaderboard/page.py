@@ -118,16 +118,20 @@ def backtest_cell(value, money=False):
     return "%.2f" % number if abs(number) < 10 else "%.1f" % number
 
 
-def backtest_block(backtest, image_src, window, nickname):
+def backtest_block(backtest, image_src, window, nickname, note=None):
     """The Studio 5 Part 4 backtest of one fund: a note, the chart (if any) and the table."""
     out = []
     if not isinstance(backtest, dict) or len(backtest) == 0:
         out.append("<p class='note'>No backtest was sent with this fund.</p>")
         return "".join(out)
     window = window or ["", ""]
-    out.append("<p class='note'>From the Studio 5 notebook (Part 4). The model was fit on the data before the last "
-               "12 months, then each portfolio was held through those 12 months, which the model never saw. "
-               "Data window: %s to %s.</p>" % (html.escape(str(window[0])), html.escape(str(window[-1]))))
+    if note:
+        out.append("<p class='note'>%s Data: %s to %s.</p>" % (html.escape(str(note)), html.escape(str(window[0])),
+                                                                html.escape(str(window[-1]))))
+    else:
+        out.append("<p class='note'>From the Studio 5 notebook (Part 4). The model was fit on the data before the last "
+                   "12 months, then each portfolio was held through those 12 months, which the model never saw. "
+                   "Data window: %s to %s.</p>" % (html.escape(str(window[0])), html.escape(str(window[-1]))))
     if image_src is not None:
         out.append("<img class='chart' src='%s' alt='Backtest chart'>" % html.escape(image_src))
     columns = []
@@ -151,8 +155,13 @@ def backtest_block(backtest, image_src, window, nickname):
             out.append("<td>%s</td>" % backtest_cell(backtest[row_name].get(column), money=column.startswith("ending value")))
         out.append("</tr>")
     out.append("</table></div>")
-    out.append("<p class='note'>\"Promised average month\" is what the model expected from the data it was fit on; "
-               "\"average month\" is what actually happened in the year it never saw.</p>")
+    has_promised = False
+    for column in columns:
+        if column.startswith("promised"):
+            has_promised = True
+    if has_promised:
+        out.append("<p class='note'>\"Promised average month\" is what the model expected from the data it was fit on; "
+                   "\"average month\" is what actually happened in the year it never saw.</p>")
     return "".join(out)
 
 
@@ -202,7 +211,7 @@ def featured_section(featured):
     # Backtest
     out.append("<div class='pane' id='pane-backtest' hidden>")
     out.append(backtest_block(featured.get("backtest"), "backtest.png?t=%s" % stamp if featured.get("backtest_png") is not None else None,
-                              featured.get("data_window"), featured["nickname"]))
+                              featured.get("data_window"), featured["nickname"], featured.get("backtest_note")))
     out.append("</div>")
 
     out.append("""<script>
@@ -226,7 +235,8 @@ def fund_name(nickname, netid, links):
     return text
 
 
-def render(result, updated_et, chart_name="chart.png", featured=None, links=None, backtests=None):
+def render(result, updated_et, chart_name="chart.png", featured=None, links=None, backtests=None,
+           backtests_chart=False):
     board = result["board"]
     pending = result["pending"]
     out = []
@@ -291,22 +301,24 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
         out.append("</table></div>")
 
     if backtests is not None and len(backtests) > 0:
-        out.append("<h2>Best backtests (Studio 5, Part 4)</h2>")
-        out.append("<p class='note'>Each fund's model was fit without its last 12 months of data, then held through those 12 "
-                   "months. These are the years the models never saw: a fair test, but the past, not the race above.</p>")
-        out.append("<img class='chart' src='backtests.png?t=%s' alt='Every fund backtest'>" % html.escape(updated_et.replace(" ", "")))
+        out.append("<h2>Best backtests</h2>")
+        out.append("<p class='note'>Each fund's latest backtest. Studio 5: the model was fit without its last 12 months, then "
+                   "held through them. Studio 6: the fund's rebalancing strategy run through 2026 so far, after trading costs. "
+                   "Fair tests, but the past, not the race above.</p>")
+        if backtests_chart:
+            out.append("<img class='chart' src='backtests.png?t=%s' alt='Every fund backtest'>" % html.escape(updated_et.replace(" ", "")))
         out.append("<div class='tablebox'><table><tr><th>Rank</th><th class='l'>Fund</th><th class='l'>Theme</th>"
                    "<th>$10,000 became (with rules)</th><th>Its no-rules twin</th><th>S&amp;P 500, same year</th>"
-                   "<th>Beat the S&amp;P 500 by</th><th>Worst drop</th><th>Test year ended</th></tr>")
+                   "<th>Beat the S&amp;P 500 by</th><th>Worst drop</th><th>Backtest</th><th>Ended</th></tr>")
         for k in range(len(backtests)):
             r = backtests[k]
             beat = r["with_rules"] - r["spy"]
             out.append("<tr><td>%d</td><td class='l fund'>%s</td><td class='l theme'>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-                       "<td>%s</td><td>%s</td><td>%s</td></tr>" % (
+                       "<td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (
                            k + 1, fund_name(r["nickname"], r["netid"], links), html.escape(str(r["theme"])),
                            backtest_cell(r["with_rules"], money=True), backtest_cell(r["no_rules"], money=True),
                            backtest_cell(r["spy"], money=True), money_diff(beat), plain_pct(r["worst_drop"]),
-                           html.escape(str(r["window"][-1]))))
+                           html.escape(str(r["kind"])), html.escape(str(r["window"][-1]))))
         out.append("</table></div>")
 
     if n_live == 0 and n_wait == 0:

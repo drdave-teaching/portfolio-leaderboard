@@ -213,6 +213,7 @@ def build_http(request):
         except Exception:
             logging.warning("fund pages skipped: %s", traceback.format_exc())
         backtests = []
+        backtests_png = None
         try:
             backtests, backtests_png = fund_pages.backtest_board(result, entries)
             if backtests_png is not None:
@@ -226,7 +227,8 @@ def build_http(request):
             blob = public_bucket.blob("chart.png")
             blob.cache_control = "no-cache, max-age=0"
             blob.upload_from_string(chart, content_type="image/png")
-        write_text(public_bucket, "index.html", page.render(result, updated, featured=featured, links=links, backtests=backtests), "text/html")
+        write_text(public_bucket, "index.html", page.render(result, updated, featured=featured, links=links, backtests=backtests,
+                                                                backtests_chart=backtests_png is not None), "text/html")
 
         summary = {"ok": True, "entries": len(entries), "funds_live": len(result["board"]),
                    "funds_waiting": len(result["pending"]), "last_close": result["last_close"],
