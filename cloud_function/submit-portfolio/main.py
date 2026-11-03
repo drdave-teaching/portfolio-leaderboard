@@ -172,6 +172,7 @@ def submit_http(request):
         "counts_from": "the next market close after %s" % cleaned["received_utc"],
         "board": BOARD_URL,
         "fund_page": fund_page_url(cleaned["netid"]),
+        "record": record_url(cleaned["netid"]),
     })
 
 
@@ -186,3 +187,16 @@ def fund_page_url(netid):
         return ""
     slug = hashlib.sha256((salt + netid).encode("utf-8")).hexdigest()[:12]
     return BOARD_URL.rsplit("/", 1)[0] + "/funds/%s.html" % slug
+
+
+def record_url(netid):
+    """The fund's private record (for the final-project dashboard). Same address the builder writes."""
+    try:
+        salt_blob = storage.Client().bucket(ENTRIES_BUCKET).blob("config/salt.txt")
+        if not salt_blob.exists():
+            return ""
+        salt = salt_blob.download_as_text().strip()
+    except Exception:
+        return ""
+    slug = hashlib.sha256((salt + netid + "|record").encode("utf-8")).hexdigest()[:24]
+    return BOARD_URL.rsplit("/", 1)[0] + "/records/%s.json" % slug

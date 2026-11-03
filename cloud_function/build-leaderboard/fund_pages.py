@@ -37,6 +37,45 @@ def slug_for(netid, salt):
     return hashlib.sha256((salt + netid).encode("utf-8")).hexdigest()[:12]
 
 
+def record_slug_for(netid, salt):
+    """The private record's address: a different hash, never linked from the board, only sent in the receipt."""
+    return hashlib.sha256((salt + netid + "|record").encode("utf-8")).hexdigest()[:24]
+
+
+def record_json(netid, mine, result, prices, trading_days, updated):
+    """Everything a student's dashboard needs: their entries (with holdings) and the daily values."""
+    entries_out = []
+    for entry in mine:
+        day = scoring.first_close_after(entry["received_utc"], trading_days)
+        entries_out.append({
+            "received_utc": entry["received_utc"],
+            "counts_from": day.strftime("%Y-%m-%d") if day is not None else None,
+            "reason": entry.get("reason", ""),
+            "theme": entry.get("theme", ""),
+            "notebook": entry.get("notebook", ""),
+            "strategy": entry.get("strategy"),
+            "risk_limit": entry.get("risk_limit"),
+            "portfolios": entry["portfolios"],
+        })
+    values = {"dates": [], "with_rules": [], "no_rules": []}
+    spy = {"dates": [], "values": []}
+    own = result["values"]
+    if len(own) > 0:
+        own = own[own["netid"] == netid]
+        ruled = own[own["portfolio"] == "with_rules"].sort_values("date")
+        free = own[own["portfolio"] == "no_rules"].sort_values("date")
+        values["dates"] = list(ruled["date"])
+        values["with_rules"] = list(ruled["value"])
+        values["no_rules"] = list(free["value"])
+        if len(ruled) > 0 and scoring.BENCHMARK in prices.columns:
+            line = prices.loc[ruled["date"].iloc[0]:, scoring.BENCHMARK].ffill()
+            for day in line.index:
+                spy["dates"].append(day.strftime("%Y-%m-%d"))
+                spy["values"].append(round(float(10000 * line.loc[day] / line.iloc[0]), 2))
+    return {"nickname": mine[-1].get("nickname", ""), "theme": mine[-1].get("theme", ""), "updated": updated,
+            "last_close": result["last_close"], "entries": entries_out, "values": values, "spy": spy}
+
+
 def upload(bucket, key, data, content_type):
     blob = bucket.blob(key)
     blob.cache_control = "no-cache, max-age=0"
@@ -168,7 +207,14 @@ def build(result, entries, prices, entries_bucket, public_bucket, read_text, wri
                              latest.get("backtest"), backtest_src, latest.get("data_window"), updated,
                              latest.get("backtest_note"))
             upload(public_bucket, "funds/%s.html" % slug, full, "text/html")
-        state[netid] = {"backtest_for": mark, "value_for": "%s|%s" % (mark, last_close), "page": digest}
+        # the private record (only rewritten when something in it changed)
+        record = record_json(netid, mine, result, prices, trading_days, "")
+        record_digest = hashlib.sha256(json.dumps(record, sort_keys=True).encode("utf-8")).hexdigest()
+        if before.get("record") != record_digest:
+            record["updated"] = updated
+            upload(public_bucket, "records/%s.json" % record_slug_for(netid, salt), json.dumps(record), "application/json")
+        state[netid] = {"backtest_for": mark, "value_for": "%s|%s" % (mark, last_close), "page": digest,
+                        "record": record_digest}
 
     write_text(entries_bucket, STATE_KEY, json.dumps(state), "application/json")
     return links
