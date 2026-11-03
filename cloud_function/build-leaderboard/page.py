@@ -302,8 +302,8 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
 
     if backtests is not None and len(backtests) > 0:
         out.append("<h2>Best backtests</h2>")
-        out.append("<p class='note'>Each fund's latest backtest. Studio 5: the model was fit without its last 12 months, then "
-                   "held through them. Studio 6: the fund's rebalancing strategy run through 2026 so far, after trading costs. "
+        out.append("<p class='note'>Each fund's latest backtest. Studio 5: the model was fit on 2021 to 2025, then "
+                   "held through 2026. Studio 6: the fund's rebalancing strategy run through 2026 so far, after trading costs. "
                    "Fair tests, but the past, not the race above.</p>")
         if backtests_chart:
             out.append("<img class='chart' src='backtests.png?t=%s' alt='Every fund backtest'>" % html.escape(updated_et.replace(" ", "")))

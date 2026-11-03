@@ -253,7 +253,7 @@ def backtest_board(result, entries):
                      "with_rules": number(ruled.get("ending value ($)")), "no_rules": number(free.get("ending value ($)")),
                      "spy": number(spy.get("ending value ($)")), "worst_drop": number(ruled.get("worst drop (%)")),
                      "window": entry.get("data_window") or ["", ""],
-                     "kind": "Studio 6 (2026 so far)" if entry.get("notebook") == "studio6" else "Studio 5 (12 months it never saw)"})
+                     "kind": "Studio 6 (2026 so far)" if entry.get("notebook") == "studio6" else "Studio 5 (2026, never seen)"})
         paths = entry.get("backtest_paths")
         if isinstance(paths, dict) and isinstance(paths.get("with your rules"), dict):
             lines[entry.get("nickname", netid)] = paths["with your rules"]
