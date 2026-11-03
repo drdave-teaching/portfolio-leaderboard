@@ -188,7 +188,7 @@ def build(result, entries, prices, entries_bucket, public_bucket, read_text, wri
         value_src = None
         if netid in rows:
             value_src = "%s_value.png?v=%s" % (slug, last_close)
-            if before.get("value_for") != "%s|%s" % (mark, last_close):
+            if before.get("value_for") != "%s|%s|live" % (mark, last_close):
                 upload(public_bucket, "funds/%s_value.png" % slug, value_chart(netid, nickname, result["values"], prices), "image/png")
 
         history = []
@@ -213,7 +213,7 @@ def build(result, entries, prices, entries_bucket, public_bucket, read_text, wri
         if before.get("record") != record_digest:
             record["updated"] = updated
             upload(public_bucket, "records/%s.json" % record_slug_for(netid, salt), json.dumps(record), "application/json")
-        state[netid] = {"backtest_for": mark, "value_for": "%s|%s" % (mark, last_close), "page": digest,
+        state[netid] = {"backtest_for": mark, "value_for": "%s|%s|%s" % (mark, last_close, "live" if netid in rows else "waiting"), "page": digest,
                         "record": record_digest}
 
     write_text(entries_bucket, STATE_KEY, json.dumps(state), "application/json")
