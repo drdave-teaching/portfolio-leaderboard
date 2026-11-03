@@ -38,7 +38,8 @@ gcloud storage buckets add-iam-policy-binding "gs://${ENTRIES_BUCKET}" \
 if ! gcloud storage buckets describe "gs://${PUBLIC_BUCKET}" >/dev/null 2>&1; then
   gcloud storage buckets create "gs://${PUBLIC_BUCKET}" --location="${REGION}" --uniform-bucket-level-access
 fi
-gcloud storage buckets add-iam-policy-binding "gs://${PUBLIC_BUCKET}" --member="allUsers" --role="roles/storage.objectViewer" >/dev/null
+# anyone can open a file by its address, but nobody can LIST the bucket (so the private records/ links stay unknown)
+gcloud storage buckets add-iam-policy-binding "gs://${PUBLIC_BUCKET}" --member="allUsers" --role="roles/storage.legacyObjectReader" >/dev/null
 gcloud storage buckets add-iam-policy-binding "gs://${PUBLIC_BUCKET}" \
   --member="serviceAccount:${APP_SA}" --role="roles/storage.objectAdmin" >/dev/null \
   && echo "✅ 4. public page: ${BOARD_URL}"
