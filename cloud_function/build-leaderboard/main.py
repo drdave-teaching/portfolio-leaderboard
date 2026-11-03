@@ -222,13 +222,16 @@ def build_http(request):
                 blob.upload_from_string(backtests_png, content_type="image/png")
         except Exception:
             logging.warning("backtest board skipped: %s", traceback.format_exc())
+        race_chart = None
         if len(result["board"]) > 0:
-            chart = page.make_chart(result["values"], result["board"], result["benchmark_path"])
+            race_chart = page.make_chart(result["values"], result["board"], result["benchmark_path"])
+        if race_chart is not None:
             blob = public_bucket.blob("chart.png")
             blob.cache_control = "no-cache, max-age=0"
-            blob.upload_from_string(chart, content_type="image/png")
+            blob.upload_from_string(race_chart, content_type="image/png")
         write_text(public_bucket, "index.html", page.render(result, updated, featured=featured, links=links, backtests=backtests,
-                                                                backtests_chart=backtests_png is not None), "text/html")
+                                                                backtests_chart=backtests_png is not None,
+                                                                race_chart=race_chart is not None), "text/html")
 
         summary = {"ok": True, "entries": len(entries), "funds_live": len(result["board"]),
                    "funds_waiting": len(result["pending"]), "last_close": result["last_close"],

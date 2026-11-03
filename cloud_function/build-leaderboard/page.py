@@ -6,6 +6,7 @@ import io
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.ticker
 import numpy as np
 import pandas as pd
 
@@ -77,11 +78,18 @@ def points(value):
     return '<span class="%s">%+.2f</span>' % (css, value)
 
 
+def dollars(value, position):
+    return "${:,.0f}".format(value)
+
+
 def make_chart(values, board, benchmark_path):
-    """Every fund's with-rules value since it started, plus the S&P 500 from the first start day."""
+    """Every fund's with-rules value since it started, plus the S&P 500 from the first start day.
+    None until there are at least two closes (a line through one point draws nothing)."""
+    rules = values[values["portfolio"] == "with_rules"]
+    if len(rules) == 0 or rules["date"].nunique() < 2:
+        return None
     figure = plt.figure(figsize=(11, 5), dpi=110)
     axis = figure.add_subplot(111)
-    rules = values[values["portfolio"] == "with_rules"]
     nicknames = {}
     for i in range(len(board)):
         nicknames[board.loc[i, "netid"]] = board.loc[i, "nickname"]
@@ -89,10 +97,13 @@ def make_chart(values, board, benchmark_path):
         mine = rules[rules["netid"] == netid]
         if len(mine) == 0:
             continue
-        axis.plot(pd.to_datetime(mine["date"]), mine["value"], linewidth=1.6, alpha=0.85, label=nicknames[netid])
+        axis.plot(pd.to_datetime(mine["date"]), mine["value"], linewidth=1.6, alpha=0.85, marker="o", markersize=3,
+                  label=nicknames[netid])
     if len(benchmark_path) > 0:
-        axis.plot(benchmark_path.index, benchmark_path.values, color="black", linewidth=3, label="S&P 500 (SPY)")
+        axis.plot(benchmark_path.index, benchmark_path.values, color="black", linewidth=3, marker="o", markersize=3,
+                  label="S&P 500 (SPY)")
     axis.axhline(10000, color="#bbbbbb", linestyle="--", linewidth=1)
+    axis.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(dollars))
     axis.set_ylabel("Value of $10,000")
     axis.set_title("Every fund (with its rules) since it started")
     axis.grid(alpha=0.25)
@@ -236,7 +247,7 @@ def fund_name(nickname, netid, links):
 
 
 def render(result, updated_et, chart_name="chart.png", featured=None, links=None, backtests=None,
-           backtests_chart=False):
+           backtests_chart=False, race_chart=True):
     board = result["board"]
     pending = result["pending"]
     out = []
@@ -287,7 +298,12 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
         out.append("</table></div>")
         out.append("<p class='note'>\"Rules vs no rules\" and \"vs S&amp;P 500\" are percentage points over the same days. "
                    "\"Worst drop\" is the biggest fall from a high point so far.</p>")
-        out.append("<h2>The race</h2><img class='chart' src='%s' alt='Value of every fund over time'>" % chart_name)
+        if race_chart:
+            out.append("<h2>The race</h2><img class='chart' src='%s?t=%s' alt='Value of every fund over time'>" % (
+                chart_name, html.escape(updated_et.replace(" ", ""))))
+        else:
+            out.append("<h2>The race</h2><p class='note'>The race chart starts after the second market close: "
+                       "a line needs at least two days.</p>")
 
     if n_wait > 0:
         out.append("<h2>Starting at the next market close</h2>")
