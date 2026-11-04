@@ -228,6 +228,14 @@ def number(value):
     return out
 
 
+def backtest_kind(notebook):
+    if notebook == "studio6":
+        return "Studio 6 (2026 so far)"
+    if notebook == "momentum":
+        return "momentum 50/200 (2026)"
+    return "Studio 5 (2026, never seen)"
+
+
 def backtest_board(result, entries):
     """Every fund's Studio 5 backtest, best first, and one chart of all their with-rules backtest lines."""
     keep = set(result["board"]["netid"]) if len(result["board"]) > 0 else set()
@@ -254,7 +262,7 @@ def backtest_board(result, entries):
                      "with_rules": number(ruled.get("ending value ($)")), "no_rules": number(free.get("ending value ($)")),
                      "spy": number(spy.get("ending value ($)")), "worst_drop": number(ruled.get("worst drop (%)")),
                      "window": entry.get("data_window") or ["", ""],
-                     "kind": "Studio 6 (2026 so far)" if entry.get("notebook") == "studio6" else "Studio 5 (2026, never seen)"})
+                     "kind": backtest_kind(entry.get("notebook"))})
         paths = entry.get("backtest_paths")
         if isinstance(paths, dict) and isinstance(paths.get("with your rules"), dict):
             lines[entry.get("nickname", netid)] = paths["with your rules"]
