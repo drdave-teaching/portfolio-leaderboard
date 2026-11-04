@@ -47,6 +47,8 @@ function lbChart(id, data, startOn) {
   function sv(tag, attrs) { var e = document.createElementNS(NS, tag); for (var k in attrs) { e.setAttribute(k, attrs[k]); } return e; }
   function color(i) { return COLORS[i % COLORS.length]; }
   function dash(i) { return i < COLORS.length ? '' : '6 4'; }
+  function count(vals) { var k = 0; for (var j = 0; j < vals.length; j++) { if (vals[j] !== null) { k++; } } return k; }
+  function valueAt(vals, j) { var first = -1, last = -1; for (var k = 0; k < vals.length; k++) { if (vals[k] !== null) { if (first < 0) { first = k; } last = k; } } if (first < 0 || j < first || j > last) { return null; } while (vals[j] === null) { j--; } return vals[j]; }
   function money(v) { return '$' + Math.round(v).toLocaleString('en-US'); }
   function shortDate(s) { var d = new Date(s + 'T12:00:00'); return d.toLocaleDateString('en-US', {month:'short', day:'numeric'}); }
 
@@ -117,7 +119,13 @@ function lbChart(id, data, startOn) {
     scan([10000]);
     var pad = Math.max((hi - lo) * 0.08, 50);
     lo -= pad; hi += pad;
-    function X(j) { return m < 2 ? L : L + (W - L - R) * j / (m - 1); }
+    var ms = [];
+    for (var q2 = 0; q2 < m; q2++) { ms.push(new Date(data.dates[q2] + 'T12:00:00').getTime()); }
+    function X(j) {
+      if (m < 2) { return L; }
+      if (data.timeAxis) { return L + (W - L - R) * (ms[j] - ms[0]) / (ms[m - 1] - ms[0]); }
+      return L + (W - L - R) * j / (m - 1);
+    }
     function Y(v) { return T + (H - T - B) * (hi - v) / (hi - lo); }
     geom = {X: X, Y: Y, L: L, R: R, W: W, H: H, T: T, B: B, m: m};
 
@@ -144,7 +152,7 @@ function lbChart(id, data, startOn) {
     function line(vals, stroke, width, dashes, opacity) {
       var d = '', pen = false;
       for (var j = 0; j < vals.length; j++) {
-        if (vals[j] === null) { pen = false; continue; }
+        if (vals[j] === null) { continue; }
         d += (pen ? 'L' : 'M') + X(j).toFixed(1) + ' ' + Y(vals[j]).toFixed(1);
         pen = true;
       }
@@ -152,7 +160,7 @@ function lbChart(id, data, startOn) {
       var p = sv('path', {d: d, fill: 'none', stroke: stroke, 'stroke-width': width, 'stroke-linejoin': 'round', opacity: opacity});
       if (dashes) { p.setAttribute('stroke-dasharray', dashes); }
       svg.appendChild(p);
-      if (m <= 40) {
+      if (count(vals) <= 40) {
         for (var k = 0; k < vals.length; k++) {
           if (vals[k] !== null) { svg.appendChild(sv('circle', {cx: X(k), cy: Y(vals[k]), r: width > 2.5 ? 3 : 2.4, fill: stroke, opacity: opacity})); }
         }
@@ -174,12 +182,12 @@ function lbChart(id, data, startOn) {
   function readout(ev, guide) {
     var r = svg.getBoundingClientRect();
     var px = (ev.clientX - r.left) * geom.W / r.width;
-    var j = geom.m < 2 ? 0 : Math.round((px - geom.L) / (geom.W - geom.L - geom.R) * (geom.m - 1));
-    j = Math.max(0, Math.min(geom.m - 1, j));
+    var j = 0;
+    for (var c = 1; c < geom.m; c++) { if (Math.abs(geom.X(c) - px) < Math.abs(geom.X(j) - px)) { j = c; } }
     guide.setAttribute('x1', geom.X(j)); guide.setAttribute('x2', geom.X(j)); guide.setAttribute('visibility', 'visible');
     var rows = [];
-    for (var i = 0; i < n; i++) { if (on[i] && data.series[i].values[j] !== null) { rows.push([data.series[i].values[j], data.series[i].name, color(i)]); } }
-    if (data.benchmark && data.benchmark.values[j] !== null) { rows.push([data.benchmark.values[j], data.benchmark.name, '#111111']); }
+    for (var i = 0; i < n; i++) { var v = valueAt(data.series[i].values, j); if (on[i] && v !== null) { rows.push([v, data.series[i].name, color(i)]); } }
+    if (data.benchmark) { var bv = valueAt(data.benchmark.values, j); if (bv !== null) { rows.push([bv, data.benchmark.name, '#111111']); } }
     rows.sort(function (a, b) { return b[0] - a[0]; });
     while (tip.firstChild) { tip.removeChild(tip.firstChild); }
     tip.appendChild(el('div', 'd', shortDate(data.dates[j])));
@@ -274,7 +282,7 @@ def paths_data(named_paths, spy_path):
         for d in spy_path:
             by_date[pd.Timestamp(d).strftime("%Y-%m-%d")] = spy_path[d]
         benchmark = {"name": "S&P 500 (SPY)", "values": on_dates(by_date, dates)}
-    return {"dates": dates, "series": series, "benchmark": benchmark, "ranked": True}
+    return {"dates": dates, "series": series, "benchmark": benchmark, "ranked": True, "timeAxis": True}
 
 
 def safe_json(data):
