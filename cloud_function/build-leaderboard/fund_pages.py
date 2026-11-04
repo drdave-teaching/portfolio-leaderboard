@@ -250,6 +250,7 @@ def backtest_board(result, entries):
         free = backtest.get("no rules", {})
         spy = backtest.get("S&P 500 (SPY)", {}) if isinstance(backtest.get("S&P 500 (SPY)"), dict) else {}
         rows.append({"netid": netid, "nickname": entry.get("nickname", ""), "theme": entry.get("theme", ""),
+                     "stock_list": entry.get("stock_theme", ""),
                      "with_rules": number(ruled.get("ending value ($)")), "no_rules": number(free.get("ending value ($)")),
                      "spy": number(spy.get("ending value ($)")), "worst_drop": number(ruled.get("worst drop (%)")),
                      "window": entry.get("data_window") or ["", ""],

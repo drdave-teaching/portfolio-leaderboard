@@ -238,6 +238,32 @@ document.querySelectorAll('.tab').forEach(function (button) {
     return "".join(out)
 
 
+STOCK_LISTS = {
+    "starter": "⭐ starter list",
+    "connecticut": "🏛️ Connecticut",
+    "ai_chips": "🤖 AI chips",
+    "oil_and_gas": "🛢️ oil and gas",
+    "banks_and_payments": "🏦 banks and payments",
+    "dividends": "💵 dividends",
+    "healthcare": "🩺 healthcare",
+    "food_and_restaurants": "🍔 food and restaurants",
+    "travel": "✈️ travel",
+    "defense_and_aerospace": "🛡️ defense and aerospace",
+    "utilities_and_power": "⚡ utilities and power",
+    "shopping": "🛍️ shopping",
+    "sports_and_entertainment": "🏟️ sports and entertainment",
+    "dartboard": "🐒 dartboard",
+    "momentum_50_200": "📈 momentum 50/200",
+}
+
+
+def stock_list_label(code):
+    """The Studio 5 stock list a fund was built from, with the infographic's emoji; 'custom' when none was picked."""
+    if code is None or (isinstance(code, float) and np.isnan(code)) or str(code).strip() == "":
+        return "custom"
+    return html.escape(STOCK_LISTS.get(str(code), str(code)))
+
+
 def fund_name(nickname, netid, links):
     """The nickname, linked to the fund's own page when it has one."""
     text = html.escape(str(nickname))
@@ -284,13 +310,14 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
     if n_live > 0:
         out.append("<h2>The leaderboard (ranked by your fund: the portfolio with your rules)</h2>")
         out.append("<div class='tablebox'><table><tr><th>Rank</th><th class='l'>Fund</th><th class='l'>Theme</th>"
-                   "<th>Value</th><th>Since start</th><th>Its no-rules twin</th><th>Rules vs no rules</th>"
+                   "<th class='l'>Stock list</th><th>Value</th><th>Since start</th><th>Its no-rules twin</th><th>Rules vs no rules</th>"
                    "<th>vs S&amp;P 500</th><th>Worst drop</th><th>Stocks</th><th>Changes</th><th>Started</th></tr>")
         for i in range(len(board)):
             r = board.loc[i]
-            out.append("<tr><td>%d</td><td class='l fund'>%s</td><td class='l theme'>%s</td><td>$%s</td><td>%s</td>"
-                       "<td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>" % (
+            out.append("<tr><td>%d</td><td class='l fund'>%s</td><td class='l theme'>%s</td><td class='l'>%s</td><td>$%s</td>"
+                       "<td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>" % (
                            r["rank"], fund_name(r["nickname"], r["netid"], links), html.escape(str(r["theme"])),
+                           stock_list_label(r.get("stock_list")),
                            "{:,.0f}".format(r["with_rules_value"]), pct(r["with_rules_growth_pct"]),
                            pct(r["no_rules_growth_pct"]), points(r["rules_minus_no_rules_pct"]),
                            points(r["rules_minus_spy_pct"]), plain_pct(r["with_rules_worst_drop_pct"]),
@@ -308,11 +335,12 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
     if n_wait > 0:
         out.append("<h2>Starting at the next market close</h2>")
         out.append("<div class='tablebox'><table><tr><th class='l'>Fund</th><th class='l'>Theme</th>"
-                   "<th>Stocks (with rules)</th><th>Stocks (no rules)</th><th>Counts from the close on</th></tr>")
+                   "<th class='l'>Stock list</th><th>Stocks (with rules)</th><th>Stocks (no rules)</th><th>Counts from the close on</th></tr>")
         for i in range(len(pending)):
             r = pending.loc[i]
-            out.append("<tr><td class='l fund'>%s</td><td class='l theme'>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>" % (
-                fund_name(r["nickname"], r["netid"], links), html.escape(str(r["theme"])), r["stocks_with_rules"],
+            out.append("<tr><td class='l fund'>%s</td><td class='l theme'>%s</td><td class='l'>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>" % (
+                fund_name(r["nickname"], r["netid"], links), html.escape(str(r["theme"])),
+                stock_list_label(r.get("stock_list")), r["stocks_with_rules"],
                 r["stocks_no_rules"], html.escape(str(r["starts"]))))
         out.append("</table></div>")
 
@@ -324,14 +352,15 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
         if backtests_chart:
             out.append("<img class='chart' src='backtests.png?t=%s' alt='Every fund backtest'>" % html.escape(updated_et.replace(" ", "")))
         out.append("<div class='tablebox'><table><tr><th>Rank</th><th class='l'>Fund</th><th class='l'>Theme</th>"
-                   "<th>$10,000 became (with rules)</th><th>Its no-rules twin</th><th>S&amp;P 500, same year</th>"
+                   "<th class='l'>Stock list</th><th>$10,000 became (with rules)</th><th>Its no-rules twin</th><th>S&amp;P 500, same year</th>"
                    "<th>Beat the S&amp;P 500 by</th><th>Worst drop</th><th>Backtest</th><th>Ended</th></tr>")
         for k in range(len(backtests)):
             r = backtests[k]
             beat = r["with_rules"] - r["spy"]
-            out.append("<tr><td>%d</td><td class='l fund'>%s</td><td class='l theme'>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-                       "<td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (
+            out.append("<tr><td>%d</td><td class='l fund'>%s</td><td class='l theme'>%s</td><td class='l'>%s</td><td>%s</td><td>%s</td>"
+                       "<td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (
                            k + 1, fund_name(r["nickname"], r["netid"], links), html.escape(str(r["theme"])),
+                           stock_list_label(r.get("stock_list")),
                            backtest_cell(r["with_rules"], money=True), backtest_cell(r["no_rules"], money=True),
                            backtest_cell(r["spy"], money=True), money_diff(beat), plain_pct(r["worst_drop"]),
                            html.escape(str(r["kind"])), html.escape(str(r["window"][-1]))))
