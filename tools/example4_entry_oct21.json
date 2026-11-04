@@ -1,0 +1,139 @@
+{
+ "netid": "zzz00004",
+ "nickname": "Dave's example 4",
+ "theme": "AI and energy with the 50/200 rule (the same 20 stocks as example 3)",
+ "reason": "first launch: the 50/200 picks at the Oct 20 close (backdated by Dr. Dave to the Oct 21 close, for the demo)",
+ "portfolios": {
+  "with_rules": {
+   "NVDA": 0.066667,
+   "AMD": 0.066667,
+   "MU": 0.066667,
+   "LRCX": 0.066667,
+   "PLTR": 0.066667,
+   "META": 0.066667,
+   "GOOGL": 0.066667,
+   "AMZN": 0.066667,
+   "LLY": 0.066667,
+   "GE": 0.066667,
+   "CAT": 0.066667,
+   "ETN": 0.066667,
+   "XOM": 0.066667,
+   "COP": 0.066667,
+   "OXY": 0.066667
+  },
+  "no_rules": {
+   "NVDA": 0.05,
+   "AVGO": 0.05,
+   "AMD": 0.05,
+   "MU": 0.05,
+   "LRCX": 0.05,
+   "ORCL": 0.05,
+   "PLTR": 0.05,
+   "META": 0.05,
+   "GOOGL": 0.05,
+   "NFLX": 0.05,
+   "AMZN": 0.05,
+   "TSLA": 0.05,
+   "LLY": 0.05,
+   "ISRG": 0.05,
+   "GE": 0.05,
+   "CAT": 0.05,
+   "ETN": 0.05,
+   "XOM": 0.05,
+   "COP": 0.05,
+   "OXY": 0.05
+  }
+ },
+ "stock_theme": "momentum_50_200",
+ "sectors": {
+  "NVDA": "Technology",
+  "AVGO": "Technology",
+  "AMD": "Technology",
+  "MU": "Technology",
+  "LRCX": "Technology",
+  "ORCL": "Technology",
+  "PLTR": "Technology",
+  "META": "Communication Services",
+  "GOOGL": "Communication Services",
+  "NFLX": "Communication Services",
+  "AMZN": "Consumer Discretionary",
+  "TSLA": "Consumer Discretionary",
+  "LLY": "Health Care",
+  "ISRG": "Health Care",
+  "GE": "Industrials",
+  "CAT": "Industrials",
+  "ETN": "Industrials",
+  "XOM": "Energy",
+  "COP": "Energy",
+  "OXY": "Energy"
+ },
+ "notebook": "momentum",
+ "rules": {
+  "momentum": "hold a stock while its 50-day average is above its 200-day average; 0.1% per switch"
+ },
+ "data_window": [
+  "2025-12-31",
+  "2026-09-30"
+ ],
+ "backtest": {
+  "with your rules": {
+   "ending value ($)": 13121,
+   "total return (%)": 31.2,
+   "worst drop (%)": 13.6,
+   "trades": 31
+  },
+  "no rules": {
+   "ending value ($)": 13525,
+   "total return (%)": 35.3,
+   "worst drop (%)": 15.7
+  },
+  "S&P 500 (SPY)": {
+   "ending value ($)": 11271,
+   "total return (%)": 12.7,
+   "worst drop (%)": 8.9
+  }
+ },
+ "backtest_paths": {
+  "with your rules": {
+   "2025-12-31": 9992.0,
+   "2026-01-30": 10514.1,
+   "2026-02-27": 10460.64,
+   "2026-03-31": 10262.76,
+   "2026-04-30": 11409.73,
+   "2026-05-29": 12708.11,
+   "2026-06-30": 13449.51,
+   "2026-07-31": 12254.07,
+   "2026-08-31": 12551.62,
+   "2026-09-30": 13121.27
+  },
+  "no rules": {
+   "2025-12-31": 10000.0,
+   "2026-01-30": 10561.47,
+   "2026-02-27": 10598.55,
+   "2026-03-31": 10362.23,
+   "2026-04-30": 11847.61,
+   "2026-05-29": 13429.14,
+   "2026-06-30": 13662.81,
+   "2026-07-31": 12320.28,
+   "2026-08-31": 12983.42,
+   "2026-09-30": 13525.45
+  },
+  "S&P 500 (SPY)": {
+   "2025-12-31": 10000.0,
+   "2026-01-30": 10147.38,
+   "2026-02-27": 10059.68,
+   "2026-03-31": 9562.94,
+   "2026-04-30": 10567.55,
+   "2026-05-29": 11123.68,
+   "2026-06-30": 11009.19,
+   "2026-07-31": 11013.02,
+   "2026-08-31": 11308.16,
+   "2026-09-30": 11270.92
+  }
+ },
+ "backtest_title": "Momentum backtest: the 50/200 rule on 20 AI and energy stocks, $10,000 from Dec 31, 2025",
+ "backtest_note": "A momentum example, not Ms. Womack. The same 20 stocks as Dave's example 3, $500 each; each stock is held while its 50-day average is above its 200-day average, otherwise cash, 0.1% per switch. The 'no-rules twin' here is buy and hold of all 20. The live fund holds the stocks that were in the market at launch.",
+ "received_utc": "2026-10-21T19:00:00Z",
+ "google_email": "",
+ "submission_id": "submissions/zzz00004/2026-10-21T19-00-00Z_ex4.json"
+}

@@ -2,7 +2,7 @@
  "netid": "zzz00004",
  "nickname": "Dave's example 4",
  "theme": "AI and energy with the 50/200 rule (the same 20 stocks as example 3)",
- "reason": "first launch (an example fund from Dr. Dave: momentum, not Ms. Womack)",
+ "reason": "momentum rebalance: the 50/200 picks at the Nov 3 close",
  "portfolios": {
   "with_rules": {
    "NVDA": 0.083333,
