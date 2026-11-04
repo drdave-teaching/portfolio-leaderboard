@@ -146,6 +146,7 @@ def build_board(submissions, prices, allowed_netids=None):
             "nickname": latest.get("nickname", netid),
             "theme": latest.get("theme", ""),
             "stock_list": latest.get("stock_theme", ""),
+            "outlook": latest.get("outlook", ""),
             "google_email": latest.get("google_email", ""),
             "entries": len(entries),
             "changes": len(entries) - 1,

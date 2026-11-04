@@ -266,6 +266,16 @@ def stock_list_label(code):
     return html.escape(STOCK_LISTS.get(str(code), str(code)))
 
 
+OUTLOOKS = {"bull": "🐂 bull", "bear": "🐻 bear", "sideways": "➖ sideways"}
+
+
+def outlook_label(code):
+    """A fund's latest Studio 6 call; a dash before Studio 6."""
+    if code is None or (isinstance(code, float) and np.isnan(code)):
+        return "–"
+    return html.escape(OUTLOOKS.get(str(code).strip().lower(), "–"))
+
+
 def fund_name(nickname, netid, links):
     """The nickname, linked to the fund's own page when it has one."""
     text = html.escape(str(nickname))
@@ -305,6 +315,15 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
         rules_won = int((board["rules_minus_no_rules_pct"] > 0).sum())
         out.append("<div class='card'><div class='big'>%d of %d</div><div class='lab'>funds ahead of the S&amp;P 500</div></div>" % (beat_spy, n_live))
         out.append("<div class='card'><div class='big'>%d of %d</div><div class='lab'>funds where the rules beat no rules</div></div>" % (rules_won, n_live))
+        if "outlook" in board.columns:
+            mood = {"bull": 0, "bear": 0, "sideways": 0}
+            for code in board["outlook"]:
+                key = str(code).strip().lower()
+                if key in mood:
+                    mood[key] += 1
+            if mood["bull"] + mood["bear"] + mood["sideways"] > 0:
+                out.append("<div class='card'><div class='big'>🐂 %d · 🐻 %d · ➖ %d</div><div class='lab'>the class calls the "
+                           "market (Studio 6)</div></div>" % (mood["bull"], mood["bear"], mood["sideways"]))
     out.append("</div>")
 
     if featured is not None:
@@ -313,14 +332,14 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
     if n_live > 0:
         out.append("<h2>The leaderboard (ranked by your fund: the portfolio with your rules)</h2>")
         out.append("<div class='tablebox'><table><tr><th>Rank</th><th class='l'>Fund</th><th class='l'>Theme</th>"
-                   "<th class='l'>Stock list</th><th>Value</th><th>Since start</th><th>Its no-rules twin</th><th>Rules vs no rules</th>"
+                   "<th class='l'>Stock list</th><th class='l'>Call</th><th>Value</th><th>Since start</th><th>Its no-rules twin</th><th>Rules vs no rules</th>"
                    "<th>vs S&amp;P 500</th><th>Worst drop</th><th>Stocks</th><th>Changes</th><th>Started</th></tr>")
         for i in range(len(board)):
             r = board.loc[i]
-            out.append("<tr><td>%d</td><td class='l fund'>%s</td><td class='l theme'>%s</td><td class='l'>%s</td><td>$%s</td>"
+            out.append("<tr><td>%d</td><td class='l fund'>%s</td><td class='l theme'>%s</td><td class='l'>%s</td><td class='l'>%s</td><td>$%s</td>"
                        "<td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>" % (
                            r["rank"], fund_name(r["nickname"], r["netid"], links), html.escape(str(r["theme"])),
-                           stock_list_label(r.get("stock_list")),
+                           stock_list_label(r.get("stock_list")), outlook_label(r.get("outlook")),
                            "{:,.0f}".format(r["with_rules_value"]), pct(r["with_rules_growth_pct"]),
                            pct(r["no_rules_growth_pct"]), points(r["rules_minus_no_rules_pct"]),
                            points(r["rules_minus_spy_pct"]), plain_pct(r["with_rules_worst_drop_pct"]),

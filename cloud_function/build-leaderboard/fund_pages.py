@@ -57,6 +57,12 @@ def record_json(netid, mine, result, prices, trading_days, updated):
             "strategy": entry.get("strategy"),
             "risk_limit": entry.get("risk_limit"),
             "portfolios": entry["portfolios"],
+            "stock_theme": entry.get("stock_theme"),
+            "sectors": entry.get("sectors"),
+            "rules": entry.get("rules"),
+            "extra_rules": entry.get("extra_rules"),
+            "outlook": entry.get("outlook"),
+            "call": entry.get("call"),
         })
     values = {"dates": [], "with_rules": [], "no_rules": []}
     spy = {"dates": [], "values": []}
