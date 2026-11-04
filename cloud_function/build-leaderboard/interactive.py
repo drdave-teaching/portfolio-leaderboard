@@ -47,7 +47,7 @@ function lbChart(id, data, startOn) {
   function sv(tag, attrs) { var e = document.createElementNS(NS, tag); for (var k in attrs) { e.setAttribute(k, attrs[k]); } return e; }
   function color(i) { return COLORS[i % COLORS.length]; }
   function dash(i) { return i < COLORS.length ? '' : '6 4'; }
-  function count(vals) { var k = 0; for (var j = 0; j < vals.length; j++) { if (vals[j] !== null) { k++; } } return k; }
+  function nonNull(vals) { var k = 0; for (var j = 0; j < vals.length; j++) { if (vals[j] !== null) { k++; } } return k; }
   function valueAt(vals, j) { var first = -1, last = -1; for (var k = 0; k < vals.length; k++) { if (vals[k] !== null) { if (first < 0) { first = k; } last = k; } } if (first < 0 || j < first || j > last) { return null; } while (vals[j] === null) { j--; } return vals[j]; }
   function money(v) { return '$' + Math.round(v).toLocaleString('en-US'); }
   function shortDate(s) { var d = new Date(s + 'T12:00:00'); return d.toLocaleDateString('en-US', {month:'short', day:'numeric'}); }
@@ -160,7 +160,7 @@ function lbChart(id, data, startOn) {
       var p = sv('path', {d: d, fill: 'none', stroke: stroke, 'stroke-width': width, 'stroke-linejoin': 'round', opacity: opacity});
       if (dashes) { p.setAttribute('stroke-dasharray', dashes); }
       svg.appendChild(p);
-      if (count(vals) <= 40) {
+      if (nonNull(vals) <= 40) {
         for (var k = 0; k < vals.length; k++) {
           if (vals[k] !== null) { svg.appendChild(sv('circle', {cx: X(k), cy: Y(vals[k]), r: width > 2.5 ? 3 : 2.4, fill: stroke, opacity: opacity})); }
         }
