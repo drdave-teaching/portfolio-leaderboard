@@ -18,6 +18,7 @@ import matplotlib.ticker
 import pandas as pd
 
 import board as scoring
+import interactive
 import live
 import page
 
@@ -175,7 +176,7 @@ def build(result, entries, prices, entries_bucket, public_bucket, read_text, wri
         slug = slug_for(netid, salt)
         links[netid] = "funds/%s.html" % slug
         nickname = latest.get("nickname", "fund")
-        mark = latest.get("submission_id") or latest.get("received_utc")
+        mark = "%s|%s" % (latest.get("submission_id") or latest.get("received_utc"), nickname)
         last_close = result["last_close"]
         before = state.get(netid, {})
 
@@ -269,6 +270,12 @@ def backtest_board(result, entries):
             if spy_line is None and isinstance(paths.get("S&P 500 (SPY)"), dict):
                 spy_line = paths["S&P 500 (SPY)"]
     rows = sorted(rows, key=lambda r: -r["with_rules"] if r["with_rules"] == r["with_rules"] else 0)
+    named = []
+    for r in rows:
+        name = r["nickname"] or r["netid"]
+        if name in lines:
+            named.append((name, lines[name]))
+    data = interactive.paths_data(named, spy_line) if len(named) > 0 else None
     png = None
     if len(lines) > 0:
         figure = plt.figure(figsize=(11, 4.8), dpi=110)
@@ -294,4 +301,4 @@ def backtest_board(result, entries):
         figure.savefig(buffer, format="png")
         plt.close(figure)
         png = buffer.getvalue()
-    return rows, png
+    return rows, png, data

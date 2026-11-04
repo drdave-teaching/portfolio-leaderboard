@@ -28,6 +28,7 @@ from google.cloud import storage
 
 import board as scoring
 import fund_pages
+import interactive
 import live
 import page
 
@@ -36,6 +37,7 @@ PUBLIC_BUCKET = os.getenv("PUBLIC_BUCKET", "")
 PRICES_KEY = "prices/daily_closes.csv"
 FETCH_STATE_KEY = "prices/last_fetch.json"
 ROSTER_KEY = "roster/allowed_netids.csv"
+NICKNAMES_KEY = "config/nicknames.json"   # optional, PRIVATE: {"netid": "Better fund name", ...} renames a fund everywhere
 PRICE_HISTORY_DAYS = 14          # fetch from this many days before the first entry
 REFETCH_MINUTES = 120            # after a fetch, wait at least this long before asking Yahoo again
 EASTERN = ZoneInfo("America/New_York")
@@ -70,6 +72,22 @@ def read_entries(bucket):
         if "portfolios" in entry and "received_utc" in entry and "netid" in entry:
             entries.append(entry)
     return entries
+
+
+def apply_nicknames(bucket, entries):
+    """Dr. Dave can rename any fund (a typo, a clearer name) without anyone resubmitting."""
+    text = read_text(bucket, NICKNAMES_KEY)
+    if text is None or text.strip() == "":
+        return
+    try:
+        names = json.loads(text)
+    except ValueError:
+        logging.warning("config/nicknames.json is not valid JSON; ignoring it")
+        return
+    for entry in entries:
+        name = names.get(str(entry.get("netid", "")).lower())
+        if isinstance(name, str) and name.strip() != "":
+            entry["nickname"] = name.strip()[:60]
 
 
 def latest_expected_close(now_utc):
@@ -155,6 +173,7 @@ def build_http(request):
         public_bucket = client.bucket(PUBLIC_BUCKET)
 
         entries = read_entries(entries_bucket)
+        apply_nicknames(entries_bucket, entries)
         allowed = None
         roster_text = read_text(entries_bucket, ROSTER_KEY)
         if roster_text is not None:
@@ -214,8 +233,9 @@ def build_http(request):
             logging.warning("fund pages skipped: %s", traceback.format_exc())
         backtests = []
         backtests_png = None
+        backtests_data = None
         try:
-            backtests, backtests_png = fund_pages.backtest_board(result, entries)
+            backtests, backtests_png, backtests_data = fund_pages.backtest_board(result, entries)
             if backtests_png is not None:
                 blob = public_bucket.blob("backtests.png")
                 blob.cache_control = "no-cache, max-age=0"
@@ -223,15 +243,18 @@ def build_http(request):
         except Exception:
             logging.warning("backtest board skipped: %s", traceback.format_exc())
         race_chart = None
+        race_data = None
         if len(result["board"]) > 0:
             race_chart = page.make_chart(result["values"], result["board"], result["benchmark_path"])
+            race_data = interactive.race_data(result["values"], result["board"], result["benchmark_path"])
         if race_chart is not None:
             blob = public_bucket.blob("chart.png")
             blob.cache_control = "no-cache, max-age=0"
             blob.upload_from_string(race_chart, content_type="image/png")
         write_text(public_bucket, "index.html", page.render(result, updated, featured=featured, links=links, backtests=backtests,
                                                                 backtests_chart=backtests_png is not None,
-                                                                race_chart=race_chart is not None), "text/html")
+                                                                race_chart=race_chart is not None, race_data=race_data,
+                                                                backtests_data=backtests_data), "text/html")
 
         summary = {"ok": True, "entries": len(entries), "funds_live": len(result["board"]),
                    "funds_waiting": len(result["pending"]), "last_close": result["last_close"],

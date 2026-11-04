@@ -3,6 +3,8 @@
 import html
 import io
 
+import interactive
+
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -273,13 +275,14 @@ def fund_name(nickname, netid, links):
 
 
 def render(result, updated_et, chart_name="chart.png", featured=None, links=None, backtests=None,
-           backtests_chart=False, race_chart=True):
+           backtests_chart=False, race_chart=True, race_data=None, backtests_data=None):
     board = result["board"]
     pending = result["pending"]
     out = []
     out.append("<!doctype html><html lang='en'><head><meta charset='utf-8'>")
     out.append("<meta name='viewport' content='width=device-width, initial-scale=1'>")
-    out.append("<title>OPIM 5641 Portfolio Leaderboard</title><style>%s</style></head><body>" % CSS)
+    out.append("<title>OPIM 5641 Portfolio Leaderboard</title><style>%s%s</style>" % (CSS, interactive.CSS))
+    out.append("<script>%s</script></head><body>" % interactive.JS)
     out.append("<header><div class='wrap'><h1>OPIM 5641 · Portfolio Leaderboard</h1>")
     sub = "Fall 2026 · every fund starts with $10,000 · updated %s" % html.escape(updated_et)
     if result["last_close"]:
@@ -325,9 +328,15 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
         out.append("</table></div>")
         out.append("<p class='note'>\"Rules vs no rules\" and \"vs S&amp;P 500\" are percentage points over the same days. "
                    "\"Worst drop\" is the biggest fall from a high point so far.</p>")
-        if race_chart:
+        stamp = html.escape(updated_et.replace(" ", ""))
+        if race_data is not None:
+            out.append("<h2>The race</h2><p class='note'>Click a fund to turn its line on or off, or type part of a name "
+                       "in the search box. Hover over the chart to read every value on that day. The black line is the S&amp;P 500.</p>")
+            out.append(interactive.block("race", race_data, "%s?t=%s" % (chart_name, stamp) if race_chart else None,
+                                         "Value of every fund over time"))
+        elif race_chart:
             out.append("<h2>The race</h2><img class='chart' src='%s?t=%s' alt='Value of every fund over time'>" % (
-                chart_name, html.escape(updated_et.replace(" ", ""))))
+                chart_name, stamp))
         else:
             out.append("<h2>The race</h2><p class='note'>The race chart starts after the second market close: "
                        "a line needs at least two days.</p>")
@@ -349,7 +358,11 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
         out.append("<p class='note'>Each fund's latest backtest. Studio 5: the model was fit on 2021 to 2025, then "
                    "held through 2026. Studio 6: the fund's rebalancing strategy run through 2026 so far, after trading costs. "
                    "Fair tests, but the past, not the race above.</p>")
-        if backtests_chart:
+        if backtests_data is not None:
+            out.append(interactive.block("backtests", backtests_data,
+                                         "backtests.png?t=%s" % html.escape(updated_et.replace(" ", "")) if backtests_chart else None,
+                                         "Every fund backtest"))
+        elif backtests_chart:
             out.append("<img class='chart' src='backtests.png?t=%s' alt='Every fund backtest'>" % html.escape(updated_et.replace(" ", "")))
         out.append("<div class='tablebox'><table><tr><th>Rank</th><th class='l'>Fund</th><th class='l'>Theme</th>"
                    "<th class='l'>Stock list</th><th>$10,000 became (with rules)</th><th>Its no-rules twin</th><th>S&amp;P 500, same year</th>"

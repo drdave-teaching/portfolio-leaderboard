@@ -128,6 +128,35 @@ save("cde34567", "Oil Barons", "energy, then cooled off", "2026-10-21T14:00:00Z"
 now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 save("def45678", "Late Bloomer", "sports and streaming", now, {"NFLX": 1.0}, {"NFLX": 0.5, "DIS": 0.3, "NKE": 0.2})
 
+# a crowd (SIM_CROWD=20): a full class, to check the clickable charts stay readable; each has a pretend backtest
+crowd = int(os.getenv("SIM_CROWD", "0"))
+pool = ["NVDA", "LLY", "XOM", "CVX", "WMT", "CAT", "GOOGL", "META", "AAPL", "GS", "KO", "PG", "JNJ", "PEP", "VZ",
+        "NEE", "DUK", "MSFT", "AMZN", "JPM", "COST", "HD", "UNH", "AVGO", "LMT", "RTX", "DIS", "NFLX", "MCD", "SBUX"]
+for k in range(crowd):
+    picks = {}
+    for j in range(5):
+        picks[pool[(k * 3 + j * 7) % len(pool)]] = 0.2
+    received = "2026-10-%02dT2%d:00:00Z" % (7 + (k % 3) * 7, k % 4)
+    netid = "sim%05d" % k
+    save(netid, "Student fund %d" % (k + 1), "pretend theme %d" % (k + 1), received, {pool[k % len(pool)]: 1.0}, picks)
+    path = {}
+    spy = {}
+    level = 10000.0
+    for m in range(1, 11):
+        level = level * (1 + 0.004 * ((k % 7) - 2) + 0.01 * ((m * (k + 3)) % 5 - 2) / 2)
+        path["2026-%02d-28" % m] = round(level, 2)
+        spy["2026-%02d-28" % m] = round(10000 * (1 + 0.011 * m), 2)
+    key = "submissions/%s/%s.json" % (netid, received.replace(":", "-"))
+    entry = json.loads(BUCKETS["entries"].store[key].decode())
+    entry["backtest"] = {"with your rules": {"ending value ($)": level, "worst drop (%)": 4.0},
+                         "no rules": {"ending value ($)": level * 1.02}, "S&P 500 (SPY)": {"ending value ($)": spy["2026-10-28"]}}
+    entry["backtest_paths"] = {"with your rules": path, "S&P 500 (SPY)": spy}
+    entry["data_window"] = ["2021-09-01", "2026-10-28"]
+    BUCKETS["entries"].blob(key).upload_from_string(json.dumps(entry))
+if crowd > 0:
+    # Dr. Dave renames one fund without anyone resubmitting
+    BUCKETS["entries"].blob("config/nicknames.json").upload_from_string(json.dumps({"sim00000": "Renamed by Dr. Dave"}))
+
 # ---- 3. build it twice (the second run must reuse the price cache)
 for attempt in range(2):
     body, status, _ = builder.build_http(None)
