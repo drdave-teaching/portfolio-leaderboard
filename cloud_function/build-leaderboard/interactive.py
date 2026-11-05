@@ -116,6 +116,8 @@ function lbChart(id, data, startOn) {
     function scan(vals) { for (var j = 0; j < vals.length; j++) { var v = vals[j]; if (v !== null) { if (v < lo) { lo = v; } if (v > hi) { hi = v; } } } }
     for (var i = 0; i < n; i++) { if (on[i]) { scan(data.series[i].values); } }
     if (data.benchmark) { scan(data.benchmark.values); }
+    var extras = data.extras || [];
+    for (var e = 0; e < extras.length; e++) { scan(extras[e].values); }
     scan([10000]);
     var pad = Math.max((hi - lo) * 0.08, 50);
     lo -= pad; hi += pad;
@@ -171,6 +173,7 @@ function lbChart(id, data, startOn) {
       line(data.series[i2].values, color(i2), 2, dash(i2), hover >= 0 ? 0.25 : 0.9);
     }
     if (data.benchmark) { line(data.benchmark.values, '#111111', 3.2, '', 1); }
+    for (var e2 = 0; e2 < extras.length; e2++) { line(extras[e2].values, extras[e2].color, 3.2, '9 5', 1); }
     if (hover >= 0) { line(data.series[hover].values, color(hover), 4, '', 1); }
     var guide = sv('line', {x1: 0, x2: 0, y1: T, y2: H - B, stroke: '#13233a', 'stroke-opacity': 0.25, visibility: 'hidden'});
     svg.appendChild(guide);
@@ -188,6 +191,8 @@ function lbChart(id, data, startOn) {
     var rows = [];
     for (var i = 0; i < n; i++) { var v = valueAt(data.series[i].values, j); if (on[i] && v !== null) { rows.push([v, data.series[i].name, color(i)]); } }
     if (data.benchmark) { var bv = valueAt(data.benchmark.values, j); if (bv !== null) { rows.push([bv, data.benchmark.name, '#111111']); } }
+    var xs = data.extras || [];
+    for (var x = 0; x < xs.length; x++) { var xv = valueAt(xs[x].values, j); if (xv !== null) { rows.push([xv, xs[x].name, xs[x].color]); } }
     rows.sort(function (a, b) { return b[0] - a[0]; });
     while (tip.firstChild) { tip.removeChild(tip.firstChild); }
     tip.appendChild(el('div', 'd', shortDate(data.dates[j])));
@@ -235,8 +240,9 @@ def on_dates(series_by_date, dates):
     return out
 
 
-def race_data(values, board, benchmark_path):
-    """Every fund's with-rules value by day, in leaderboard order, plus the S&P 500. None until two closes."""
+def race_data(values, board, benchmark_path, extras=None):
+    """Every fund's with-rules value by day, in leaderboard order, plus the S&P 500 and any always-on lines
+    (extras: [(name, path Series, color)], e.g. the class crowd fund). None until two closes."""
     rules = values[values["portfolio"] == "with_rules"]
     if len(rules) == 0 or rules["date"].nunique() < 2:
         return None
@@ -255,7 +261,13 @@ def race_data(values, board, benchmark_path):
         for day in benchmark_path.index:
             by_date[pd.Timestamp(day).strftime("%Y-%m-%d")] = benchmark_path.loc[day]
         benchmark = {"name": "S&P 500 (SPY)", "values": on_dates(by_date, dates)}
-    return {"dates": dates, "series": series, "benchmark": benchmark, "ranked": True}
+    extra_lines = []
+    for name, path, color in (extras or []):
+        by_date = {}
+        for day in path.index:
+            by_date[pd.Timestamp(day).strftime("%Y-%m-%d")] = path.loc[day]
+        extra_lines.append({"name": name, "values": on_dates(by_date, dates), "color": color})
+    return {"dates": dates, "series": series, "benchmark": benchmark, "extras": extra_lines, "ranked": True}
 
 
 def paths_data(named_paths, spy_path):

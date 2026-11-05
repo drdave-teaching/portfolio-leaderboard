@@ -27,6 +27,7 @@ import pandas as pd
 from google.cloud import storage
 
 import board as scoring
+import crowd
 import fund_pages
 import interactive
 import live
@@ -72,6 +73,20 @@ def read_entries(bucket):
         if "portfolios" in entry and "received_utc" in entry and "netid" in entry:
             entries.append(entry)
     return entries
+
+
+def tag_concentrated(entries):
+    """A pair's 🎯 concentrated fund (Studio 6) is its own fund on the board: fund id = the sender's NetID + '-c'."""
+    for entry in entries:
+        if entry.get("fund_kind") == "concentrated" and not str(entry.get("netid", "")).endswith(crowd.CONCENTRATED_SUFFIX):
+            entry["owner_netid"] = entry["netid"]
+            entry["netid"] = entry["netid"] + crowd.CONCENTRATED_SUFFIX
+
+
+def mark_concentrated(entries):
+    for entry in entries:
+        if entry.get("fund_kind") == "concentrated" and not str(entry.get("nickname", "")).startswith("🎯"):
+            entry["nickname"] = "🎯 " + str(entry.get("nickname", ""))
 
 
 def apply_nicknames(bucket, entries):
@@ -173,7 +188,9 @@ def build_http(request):
         public_bucket = client.bucket(PUBLIC_BUCKET)
 
         entries = read_entries(entries_bucket)
+        tag_concentrated(entries)
         apply_nicknames(entries_bucket, entries)
+        mark_concentrated(entries)
         allowed = None
         roster_text = read_text(entries_bucket, ROSTER_KEY)
         if roster_text is not None:
@@ -242,11 +259,22 @@ def build_http(request):
                 blob.upload_from_string(backtests_png, content_type="image/png")
         except Exception:
             logging.warning("backtest board skipped: %s", traceback.format_exc())
+        crowds = {"crowd": None, "concentrated": None}
+        try:
+            crowds = crowd.build(entries, prices, entries_bucket, read_text, now_utc, updated)
+            write_text(public_bucket, "crowd.json", crowds["json"], "application/json")
+        except Exception:
+            logging.warning("crowd skipped: %s", traceback.format_exc())
+        extras = []
+        for key in ["crowd", "concentrated"]:
+            one = crowds.get(key)
+            if one is not None and len(one["path"]) > 0:
+                extras.append((one["name"], one["path"], "#6a1b9a" if key == "crowd" else "#c2185b"))
         race_chart = None
         race_data = None
         if len(result["board"]) > 0:
-            race_chart = page.make_chart(result["values"], result["board"], result["benchmark_path"])
-            race_data = interactive.race_data(result["values"], result["board"], result["benchmark_path"])
+            race_chart = page.make_chart(result["values"], result["board"], result["benchmark_path"], extras)
+            race_data = interactive.race_data(result["values"], result["board"], result["benchmark_path"], extras)
         if race_chart is not None:
             blob = public_bucket.blob("chart.png")
             blob.cache_control = "no-cache, max-age=0"
@@ -254,7 +282,7 @@ def build_http(request):
         write_text(public_bucket, "index.html", page.render(result, updated, featured=featured, links=links, backtests=backtests,
                                                                 backtests_chart=backtests_png is not None,
                                                                 race_chart=race_chart is not None, race_data=race_data,
-                                                                backtests_data=backtests_data), "text/html")
+                                                                backtests_data=backtests_data, crowds=crowds), "text/html")
 
         summary = {"ok": True, "entries": len(entries), "funds_live": len(result["board"]),
                    "funds_waiting": len(result["pending"]), "last_close": result["last_close"],

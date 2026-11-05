@@ -104,6 +104,33 @@ for case in bad_cases:
     print("rejected as expected:", problem)
 print("gatekeeper checks OK")
 
+# ---- 1b. a pair's 🎯 concentrated fund (Studio 6)
+focus = {"netid": "abc12345", "nickname": "Costco Believers", "theme": "great companies we understand",
+         "fund_kind": "concentrated", "partner_netid": "bcd23456",
+         "theses": {"COST": "we shop there every week and the membership keeps growing",
+                    "AAPL": "everyone in class has an iPhone", "LLY": "weight-loss drugs are a huge market"},
+         "portfolios": {"no_rules": {"COST": 0.4, "AAPL": 0.35, "LLY": 0.25},
+                        "with_rules": {"COST": 0.4, "AAPL": 0.35, "LLY": 0.25}}}
+cleaned, problem = gatekeeper.check_entry(focus)
+assert problem is None, problem
+assert gatekeeper.fund_id(cleaned) == "abc12345-c" and cleaned["partner_netid"] == "bcd23456"
+assert gatekeeper.fund_id(gatekeeper.check_entry(good)[0]) == "abc12345"
+focus_bad = [
+    dict(focus, fund_kind="yolo"),
+    dict(focus, theses={"COST": "a fine store", "AAPL": "phones"}),
+    dict(focus, portfolios={"no_rules": {"COST": 0.6, "AAPL": 0.4}, "with_rules": {"COST": 0.6, "AAPL": 0.4}}),
+    dict(focus, portfolios={"no_rules": {"COST": 0.4, "AAPL": 0.3, "NVDA": 0.3}, "with_rules": {"COST": 0.4, "AAPL": 0.3, "NVDA": 0.3}}),
+    dict(focus, partner_netid="dave"),
+    dict(focus, theses={"COST": "ok", "AAPL": "everyone in class has an iPhone", "LLY": "weight-loss drugs"}),
+]
+for case in focus_bad:
+    _, problem = gatekeeper.check_entry(case)
+    assert problem is not None, case
+    print("rejected as expected:", problem)
+print("concentrated checks OK")
+builder.crowd.CROWD_START = "2026-10-21"          # the real start (Nov 5) has no closes yet in a test run
+builder.crowd.CONCENTRATED_START = "2026-10-28"
+
 
 # ---- 2. pretend students (entries saved straight into the fake bucket, as the gatekeeper would)
 def save(netid, nickname, theme, received, no_rules, with_rules, reason="first launch"):
@@ -153,6 +180,17 @@ for k in range(crowd):
     entry["backtest_paths"] = {"with your rules": path, "S&P 500 (SPY)": spy}
     entry["data_window"] = ["2021-09-01", "2026-10-28"]
     BUCKETS["entries"].blob(key).upload_from_string(json.dumps(entry))
+# two pairs' 🎯 funds, saved where the gatekeeper puts them, plus a Dr. Dave demo fund the crowd must ignore
+for netid, name, picks in [("abc12345", "Costco Believers", {"COST": 0.4, "AAPL": 0.35, "LLY": 0.25}),
+                           ("cde34567", "Chip Conviction", {"NVDA": 0.4, "AVGO": 0.3, "AMD": 0.15, "MU": 0.15})]:
+    theses = {}
+    for t in picks:
+        theses[t] = "we understand %s and think it keeps growing" % t
+    entry = {"netid": netid, "nickname": name, "theme": "pair fund", "reason": "Studio 6 concentrated fund",
+             "received_utc": "2026-10-27T23:30:00Z", "google_email": netid + "@example.com", "fund_kind": "concentrated",
+             "theses": theses, "partner_netid": "", "portfolios": {"no_rules": picks, "with_rules": picks}}
+    BUCKETS["entries"].blob("submissions/%s-c/2026-10-27T23-30-00Z.json" % netid).upload_from_string(json.dumps(entry))
+save("zzz00009", "Dr. Dave demo", "demo", "2026-10-07T23:30:00Z", {"TSLA": 1.0}, {"TSLA": 1.0})
 if crowd > 0:
     # Dr. Dave renames one fund without anyone resubmitting
     BUCKETS["entries"].blob("config/nicknames.json").upload_from_string(json.dumps({"sim00000": "Renamed by Dr. Dave"}))
@@ -166,6 +204,25 @@ for attempt in range(2):
 store = BUCKETS["entries"].store
 for key in ["class/leaderboard_private.csv", "class/daily_values.csv", "class/entries_log.csv", "prices/daily_closes.csv"]:
     assert key in store, key
+public_crowd = json.loads(BUCKETS["page"].store["crowd.json"].decode())
+assert public_crowd["crowd"]["members"] == 4 + crowd, public_crowd["crowd"]["members"]      # 4 students, no demo, no 🎯
+assert public_crowd["concentrated_crowd"]["members"] == 2
+assert "TSLA" not in public_crowd["crowd"]["weights"]
+assert len(public_crowd["funds"]) == 4 + crowd and len(public_crowd["concentrated_funds"]) == 2
+total = 0
+for t in public_crowd["crowd"]["weights"]:
+    total += public_crowd["crowd"]["weights"][t]
+assert abs(total - 1) < 1e-4, total
+print("crowd OK:", public_crowd["crowd"]["members"], "funds,", public_crowd["crowd"]["stats"])
+open(os.path.join(OUT, "crowd.json"), "wb").write(BUCKETS["page"].store["crowd.json"])
+page_text = BUCKETS["page"].store["index.html"].decode()
+assert "🎯 Costco Believers" in page_text and "Class crowd fund" in page_text
+focus_pages = []
+for name in BUCKETS["page"].store:
+    if name.startswith("funds/") and name.endswith(".html") and "Why these companies" in BUCKETS["page"].store[name].decode():
+        focus_pages.append(name)
+assert len(focus_pages) == 2, focus_pages
+open(os.path.join(OUT, "focus_page.html"), "wb").write(BUCKETS["page"].store[focus_pages[0]])
 open(os.path.join(OUT, "index.html"), "wb").write(BUCKETS["page"].store["index.html"])
 open(os.path.join(OUT, "chart.png"), "wb").write(BUCKETS["page"].store["chart.png"])
 open(os.path.join(OUT, "leaderboard_private.csv"), "wb").write(store["class/leaderboard_private.csv"])

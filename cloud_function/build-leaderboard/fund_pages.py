@@ -63,6 +63,9 @@ def record_json(netid, mine, result, prices, trading_days, updated):
             "extra_rules": entry.get("extra_rules"),
             "outlook": entry.get("outlook"),
             "call": entry.get("call"),
+            "fund_kind": entry.get("fund_kind", "diversified"),
+            "theses": entry.get("theses"),
+            "partner_netid": entry.get("partner_netid"),
         })
     values = {"dates": [], "with_rules": [], "no_rules": []}
     spy = {"dates": [], "values": []}
@@ -119,8 +122,20 @@ def value_chart(netid, nickname, values, prices):
     return buffer.getvalue()
 
 
+def theses_block(theses):
+    """A 🎯 fund's companies and the pair's one-line reason for each (no shares: the board never shows holdings)."""
+    if not isinstance(theses, dict) or len(theses) == 0:
+        return ""
+    out = ["<h2>Why these companies</h2><div class='tablebox'><table><tr><th class='l'>Company</th><th class='l'>The pair's thesis</th></tr>"]
+    for ticker in theses:
+        out.append("<tr><td class='l fund'>%s</td><td class='l theme'>%s</td></tr>" % (html.escape(str(ticker)),
+                                                                                    html.escape(str(theses[ticker]))))
+    out.append("</table></div>")
+    return "".join(out)
+
+
 def page_html(nickname, theme, row, waiting_label, history, has_value_png, backtest, has_backtest_png, window, updated,
-              backtest_note=None):
+              backtest_note=None, theses=None):
     out = []
     out.append("<!doctype html><html lang='en'><head><meta charset='utf-8'>")
     out.append("<meta name='viewport' content='width=device-width, initial-scale=1'>")
@@ -142,6 +157,7 @@ def page_html(nickname, theme, row, waiting_label, history, has_value_png, backt
     else:
         out.append("<p class='note'>This fund starts at the close on %s. Its line shows up here after that close.</p>" %
                    html.escape(waiting_label))
+    out.append(theses_block(theses))
     out.append("<h2>Its backtest</h2>")
     out.append(page.backtest_block(backtest, has_backtest_png, window, nickname, backtest_note))
     out.append("<h2>Its history</h2><div class='tablebox'><table><tr><th class='l'>Received</th><th class='l'>Counts from the close on</th><th class='l'>Why</th></tr>")
@@ -207,12 +223,13 @@ def build(result, entries, prices, entries_bucket, public_bucket, read_text, wri
                             "reason": str(entry.get("reason", ""))})
 
         body = page_html(nickname, latest.get("theme", ""), rows.get(netid), waiting.get(netid, ""), history, value_src,
-                         latest.get("backtest"), backtest_src, latest.get("data_window"), "", latest.get("backtest_note"))
+                         latest.get("backtest"), backtest_src, latest.get("data_window"), "", latest.get("backtest_note"),
+                         latest.get("theses"))
         digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
         if before.get("page") != digest:
             full = page_html(nickname, latest.get("theme", ""), rows.get(netid), waiting.get(netid, ""), history, value_src,
                              latest.get("backtest"), backtest_src, latest.get("data_window"), updated,
-                             latest.get("backtest_note"))
+                             latest.get("backtest_note"), latest.get("theses"))
             upload(public_bucket, "funds/%s.html" % slug, full, "text/html")
         # the private record (only rewritten when something in it changed)
         record = record_json(netid, mine, result, prices, trading_days, "")
@@ -237,7 +254,7 @@ def number(value):
 
 def backtest_kind(notebook):
     if notebook == "studio6":
-        return "Studio 6 (2026 so far)"
+        return "Studio 6 🎯 what-if (2026)"
     if notebook == "momentum":
         return "momentum 50/200 (2026)"
     return "Studio 5 (2026, never seen)"

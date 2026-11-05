@@ -111,7 +111,7 @@ def build_board(submissions, prices, allowed_netids=None):
     log_rows = []
     for entry in submissions:
         netid = entry.get("netid")
-        if allowed_netids is not None and netid not in allowed_netids:
+        if allowed_netids is not None and entry.get("owner_netid", netid) not in allowed_netids:
             log_rows.append({"netid": netid, "received_utc": entry.get("received_utc"), "status": "not on roster"})
             continue
         by_student.setdefault(netid, []).append(entry)
@@ -147,6 +147,7 @@ def build_board(submissions, prices, allowed_netids=None):
             "theme": latest.get("theme", ""),
             "stock_list": latest.get("stock_theme", ""),
             "outlook": latest.get("outlook", ""),
+            "kind": latest.get("fund_kind", "diversified") or "diversified",
             "google_email": latest.get("google_email", ""),
             "entries": len(entries),
             "changes": len(entries) - 1,

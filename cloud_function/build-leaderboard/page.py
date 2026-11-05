@@ -84,7 +84,7 @@ def dollars(value, position):
     return "${:,.0f}".format(value)
 
 
-def make_chart(values, board, benchmark_path):
+def make_chart(values, board, benchmark_path, extras=None):
     """Every fund's with-rules value since it started, plus the S&P 500 from the first start day.
     None until there are at least two closes (a line through one point draws nothing)."""
     rules = values[values["portfolio"] == "with_rules"]
@@ -104,6 +104,8 @@ def make_chart(values, board, benchmark_path):
     if len(benchmark_path) > 0:
         axis.plot(benchmark_path.index, benchmark_path.values, color="black", linewidth=3, marker="o", markersize=3,
                   label="S&P 500 (SPY)")
+    for name, path, color in (extras or []):
+        axis.plot(path.index, path.values, color=color, linewidth=3, linestyle="--", label=name)
     axis.axhline(10000, color="#bbbbbb", linestyle="--", linewidth=1)
     axis.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(dollars))
     axis.set_ylabel("Value of $10,000")
@@ -256,6 +258,7 @@ STOCK_LISTS = {
     "sports_and_entertainment": "🏟️ sports and entertainment",
     "dartboard": "🐒 dartboard",
     "momentum_50_200": "📈 momentum 50/200",
+    "concentrated": "🎯 concentrated",
 }
 
 
@@ -285,8 +288,9 @@ def fund_name(nickname, netid, links):
 
 
 def render(result, updated_et, chart_name="chart.png", featured=None, links=None, backtests=None,
-           backtests_chart=False, race_chart=True, race_data=None, backtests_data=None):
+           backtests_chart=False, race_chart=True, race_data=None, backtests_data=None, crowds=None):
     board = result["board"]
+    crowds = crowds or {}
     pending = result["pending"]
     out = []
     out.append("<!doctype html><html lang='en'><head><meta charset='utf-8'>")
@@ -324,6 +328,11 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
             if mood["bull"] + mood["bear"] + mood["sideways"] > 0:
                 out.append("<div class='card'><div class='big'>🐂 %d · 🐻 %d · ➖ %d</div><div class='lab'>the class calls the "
                            "market (Studio 6)</div></div>" % (mood["bull"], mood["bear"], mood["sideways"]))
+    for key in ["crowd", "concentrated"]:
+        one = crowds.get(key)
+        if one is not None and one.get("stats") is not None:
+            out.append("<div class='card'><div class='big'>%s</div><div class='lab'>%s since %s (%d funds)</div></div>" % (
+                pct(one["stats"]["growth_pct"]), html.escape(one["name"]), html.escape(str(one["start"])), one["members"]))
     out.append("</div>")
 
     if featured is not None:
@@ -344,13 +353,28 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
                            pct(r["no_rules_growth_pct"]), points(r["rules_minus_no_rules_pct"]),
                            points(r["rules_minus_spy_pct"]), plain_pct(r["with_rules_worst_drop_pct"]),
                            r["stocks_with_rules"], r["changes"], html.escape(str(r["started"]))))
+        crowd_note = ""
+        for key in ["crowd", "concentrated"]:
+            one = crowds.get(key)
+            if one is None or one.get("stats") is None:
+                continue
+            stats = one["stats"]
+            out.append("<tr style='background:#f7f2fb'><td>–</td><td class='l fund'>%s</td><td class='l theme'>%s</td><td class='l'>–</td>"
+                       "<td class='l'>–</td><td>$%s</td><td>%s</td><td>–</td><td>–</td><td>–</td><td>%s</td><td>%d</td><td>–</td><td>%s</td></tr>" % (
+                           html.escape(one["name"]), "the average of %d %s funds" % (one["members"], "student" if key == "crowd" else "pair"),
+                           "{:,.0f}".format(stats["value"]), pct(stats["growth_pct"]), plain_pct(stats["worst_drop_pct"]),
+                           len(one["weights"]), html.escape(str(one["start"]))))
+            crowd_note = (" The shaded rows are not ranked: the class crowd fund is the average of every student's fund "
+                          "(each counts once, Dr. Dave's are left out), bought at the close on its start day and held. "
+                          "The 🎯 crowd does the same for the pairs' concentrated funds.")
         out.append("</table></div>")
         out.append("<p class='note'>\"Rules vs no rules\" and \"vs S&amp;P 500\" are percentage points over the same days. "
-                   "\"Worst drop\" is the biggest fall from a high point so far.</p>")
+                   "\"Worst drop\" is the biggest fall from a high point so far.%s</p>" % crowd_note)
         stamp = html.escape(updated_et.replace(" ", ""))
         if race_data is not None:
             out.append("<h2>The race</h2><p class='note'>Click a fund to turn its line on or off, or type part of a name "
-                       "in the search box. Hover over the chart to read every value on that day. The black line is the S&amp;P 500.</p>")
+                       "in the search box (type 🎯 for the concentrated funds). Hover over the chart to read every value on that day. "
+                       "The black line is the S&amp;P 500; the dashed lines are the class crowd funds.</p>")
             out.append(interactive.block("race", race_data, "%s?t=%s" % (chart_name, stamp) if race_chart else None,
                                          "Value of every fund over time"))
         elif race_chart:
@@ -375,7 +399,7 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
     if backtests is not None and len(backtests) > 0:
         out.append("<h2>Best backtests</h2>")
         out.append("<p class='note'>Each fund's latest backtest. Studio 5: the model was fit on 2021 to 2025, then "
-                   "held through 2026. Studio 6: the fund's rebalancing strategy run through 2026 so far, after trading costs. "
+                   "held through 2026. Studio 6 🎯 funds: today's mix held through 2026 so far, a what-if (the mix was picked with 2026 in view). "
                    "Fair tests, but the past, not the race above.</p>")
         if backtests_data is not None:
             out.append(interactive.block("backtests", backtests_data,

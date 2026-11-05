@@ -29,6 +29,11 @@ MAX_HOLDINGS = 80                  # per portfolio
 NETID_PATTERN = re.compile(r"^[a-z]{3}[0-9]{5}$")       # UConn NetID: three letters, five digits
 TICKER_PATTERN = re.compile(r"^[A-Z0-9.\-^=]{1,12}$")
 PORTFOLIO_KEYS = ["no_rules", "with_rules"]
+FUND_KINDS = ["diversified", "concentrated"]
+CONCENTRATED_MIN = 3              # a Studio 6 🎯 fund: 3 to 6 companies ...
+CONCENTRATED_MAX = 6
+CONCENTRATED_CAP = 0.40           # ... and at most 40% in any one of them
+CONCENTRATED_SUFFIX = "-c"        # the builder uses the same suffix (crowd.py)
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
 
@@ -110,7 +115,52 @@ def check_entry(entry):
     cleaned["theme"] = str(entry.get("theme", "")).strip()[:80]
     cleaned["reason"] = str(entry.get("reason", "")).strip()[:200]
     cleaned["portfolios"] = cleaned_portfolios
+    kind = str(entry.get("fund_kind", "diversified") or "diversified").strip().lower()
+    if kind not in FUND_KINDS:
+        return None, "fund_kind should be 'diversified' or 'concentrated'"
+    cleaned["fund_kind"] = kind
+    if kind == "concentrated":
+        problem = check_concentrated(entry, cleaned)
+        if problem is not None:
+            return None, problem
     return cleaned, None
+
+
+def check_concentrated(entry, cleaned):
+    """A Studio 6 🎯 fund: 3 to 6 companies, at most 40% in one, and a one-line thesis for every company it holds."""
+    theses = entry.get("theses")
+    if not isinstance(theses, dict) or len(theses) < CONCENTRATED_MIN or len(theses) > CONCENTRATED_MAX:
+        return "a concentrated fund needs %d to %d companies, each with a one-line thesis" % (CONCENTRATED_MIN, CONCENTRATED_MAX)
+    kept = {}
+    for ticker in theses:
+        if not isinstance(ticker, str) or not TICKER_PATTERN.match(ticker.upper()):
+            return "this does not look like a ticker: %r" % (ticker,)
+        text = str(theses[ticker]).strip()
+        if len(text) < 5:
+            return "write a one-line thesis for %s" % ticker.upper()
+        kept[ticker.upper()] = text[:200]
+    for key in PORTFOLIO_KEYS:
+        mix = cleaned["portfolios"][key]
+        if len(mix) > CONCENTRATED_MAX:
+            return "a concentrated fund holds at most %d companies" % CONCENTRATED_MAX
+        for ticker in mix:
+            if mix[ticker] > CONCENTRATED_CAP + 0.005:
+                return "%s is %.0f%% of the fund; the cap is %.0f%%" % (ticker, 100 * mix[ticker], 100 * CONCENTRATED_CAP)
+            if ticker not in kept:
+                return "%s is in the fund but has no thesis" % ticker
+    partner = str(entry.get("partner_netid", "") or "").strip().lower()
+    if partner != "" and not NETID_PATTERN.match(partner):
+        return "partner_netid should look like abc12345 (or leave it blank)"
+    cleaned["theses"] = kept
+    cleaned["partner_netid"] = partner
+    return None
+
+
+def fund_id(cleaned):
+    """Where the fund lives: the NetID, or the NetID + '-c' for a pair's concentrated fund (its own line on the board)."""
+    if cleaned.get("fund_kind") == "concentrated":
+        return cleaned["netid"] + CONCENTRATED_SUFFIX
+    return cleaned["netid"]
 
 
 def submit_http(request):
@@ -143,7 +193,7 @@ def submit_http(request):
     cleaned["received_utc"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     cleaned["google_email"] = email
     stamp = now.strftime("%Y-%m-%dT%H-%M-%SZ")
-    key = "submissions/%s/%s_%s.json" % (cleaned["netid"], stamp, secrets.token_hex(3))
+    key = "submissions/%s/%s_%s.json" % (fund_id(cleaned), stamp, secrets.token_hex(3))
     cleaned["submission_id"] = key
 
     blob = storage.Client().bucket(ENTRIES_BUCKET).blob(key)
@@ -171,8 +221,9 @@ def submit_http(request):
         "backtest_has_lines": isinstance(cleaned.get("backtest_paths"), dict),
         "counts_from": "the next market close after %s" % cleaned["received_utc"],
         "board": BOARD_URL,
-        "fund_page": fund_page_url(cleaned["netid"]),
-        "record": record_url(cleaned["netid"]),
+        "fund_kind": cleaned["fund_kind"],
+        "fund_page": fund_page_url(fund_id(cleaned)),
+        "record": record_url(fund_id(cleaned)),
     })
 
 
