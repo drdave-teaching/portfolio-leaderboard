@@ -9,7 +9,9 @@
 # CONCENTRATED_START.
 #
 # Public output, crowd.json: the crowd's mix and its live line, plus every member fund's weights WITHOUT names, in a
-# shuffled order, so a notebook can draw the class on a risk-return map and still never say whose fund is whose.
+# shuffled order ("funds"), so a notebook can draw the class on a risk-return map and never say whose fund is whose.
+# "named_funds" (Nov 17, Studio 6 "who holds it?") lists the same student funds by their PUBLIC leaderboard nickname:
+# the board already shows each nickname with its holdings on the fund's page. NetIDs and emails are never in this file.
 
 import hashlib
 import json
@@ -45,7 +47,7 @@ def read_excluded(bucket, read_text):
 
 
 def members(entries, concentrated, excluded):
-    """{fund id: that fund's latest with-rules mix received before the freeze}."""
+    """({fund id: that fund's latest with-rules mix received before the freeze}, {fund id: its public nickname})."""
     latest = {}
     managed = {}      # a student's first Studio 6 decision: only used when they have no Studio 5 fund at all
     for entry in entries:
@@ -69,9 +71,11 @@ def members(entries, concentrated, excluded):
         if netid not in latest:
             latest[netid] = managed[netid]
     mixes = {}
+    names = {}
     for netid in latest:
         mixes[netid] = latest[netid]["portfolios"]["with_rules"]
-    return mixes
+        names[netid] = str(latest[netid].get("nickname", "") or "a fund")
+    return mixes, names
 
 
 def average_mix(mixes):
@@ -135,8 +139,8 @@ def build(entries, prices, bucket, read_text, now_utc, updated):
     """Returns {"crowd": ..., "concentrated": ..., "json": public text}. Either crowd can be None."""
     prices = prices.sort_index().ffill()
     excluded = read_excluded(bucket, read_text)
-    diversified = members(entries, False, excluded)
-    focused = members(entries, True, excluded)
+    diversified, names = members(entries, False, excluded)
+    focused, focused_names = members(entries, True, excluded)
     crowd = one_crowd(diversified, prices, CROWD_START, "👥 Class crowd fund")
     concentrated = one_crowd(focused, prices, CONCENTRATED_START, "🎯 Concentrated crowd")
     public = {"updated": updated, "last_close": prices.index[-1].strftime("%Y-%m-%d") if len(prices) > 0 else "",
@@ -150,4 +154,8 @@ def build(entries, prices, bucket, read_text, now_utc, updated):
             continue
         public[key] = {"members": one["members"], "start": one["start"], "weights": one["weights"],
                        "stats": one["stats"], "path": path_json(one["path"])}
+    named = []
+    for netid in sorted(diversified, key=lambda n: names[n].lower()):
+        named.append({"name": names[netid], "weights": diversified[netid]})
+    public["named_funds"] = named
     return {"crowd": crowd, "concentrated": concentrated, "json": json.dumps(public)}

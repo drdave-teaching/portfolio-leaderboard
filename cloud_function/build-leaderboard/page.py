@@ -1,4 +1,4 @@
-# page.py: the public leaderboard page (nicknames only: no NetIDs, no emails, no holdings).
+# page.py: the public leaderboard page (nicknames only: no NetIDs, no emails; holdings are on each fund's own page).
 
 import html
 import io
@@ -340,6 +340,8 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
 
     if n_live > 0:
         out.append("<h2>The leaderboard (ranked by your fund: the portfolio with your rules)</h2>")
+        out.append("<p class='note' style='font-size:15px'><a href='holdings.html'><b>Who holds what &rarr;</b></a> "
+                   "every fund's stocks on one page, green or red since Nov 5. Click a fund's name for its own page.</p>")
         out.append("<div class='tablebox'><table><tr><th>Rank</th><th class='l'>Fund</th><th class='l'>Theme</th>"
                    "<th class='l'>Stock list</th><th class='l'>Call</th><th>Value</th><th>Since start</th><th>Its no-rules twin</th><th>Rules vs no rules</th>"
                    "<th>vs S&amp;P 500</th><th>Worst drop</th><th>Stocks</th><th>Changes</th><th>Started</th></tr>")

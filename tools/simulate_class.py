@@ -242,6 +242,25 @@ total = 0
 for t in public_crowd["crowd"]["weights"]:
     total += public_crowd["crowd"]["weights"][t]
 assert abs(total - 1) < 1e-4, total
+assert len(public_crowd["named_funds"]) == len(public_crowd["funds"])
+named_text = json.dumps(public_crowd["named_funds"])
+assert "Tech Titans" in named_text and "abc12345" not in named_text and "@example.com" not in named_text
+for one in public_crowd["named_funds"]:
+    assert one["weights"] in public_crowd["funds"], one["name"]
+holding_pages = 0
+for name in BUCKETS["page"].store:
+    if name.startswith("funds/") and name.endswith(".html"):
+        text = BUCKETS["page"].store[name].decode()
+        assert "abc12345" not in text and "@example.com" not in text, name
+        if "What it holds" in text:
+            holding_pages += 1
+assert holding_pages >= 4, holding_pages
+print("fund pages OK:", holding_pages, "pages list their holdings")
+who = BUCKETS["page"].store["holdings.html"].decode()
+assert "Tech Titans" in who and "Who holds what" in who and "abc12345" not in who and "@example.com" not in who
+assert "holdings.html" in BUCKETS["page"].store["index.html"].decode()
+open(os.path.join(OUT, "holdings.html"), "wb").write(BUCKETS["page"].store["holdings.html"])
+print("holdings page OK")
 print("crowd OK:", public_crowd["crowd"]["members"], "funds,", public_crowd["crowd"]["stats"])
 open(os.path.join(OUT, "crowd.json"), "wb").write(BUCKETS["page"].store["crowd.json"])
 page_text = BUCKETS["page"].store["index.html"].decode()

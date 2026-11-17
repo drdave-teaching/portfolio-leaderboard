@@ -29,6 +29,7 @@ from google.cloud import storage
 import board as scoring
 import crowd
 import fund_pages
+import holdings_page
 import interactive
 import live
 import page
@@ -248,6 +249,11 @@ def build_http(request):
                                      updated, EASTERN)
         except Exception:
             logging.warning("fund pages skipped: %s", traceback.format_exc())
+        # "Who holds what": every fund's stocks on one page (fund names only)
+        try:
+            write_text(public_bucket, "holdings.html", holdings_page.render(result, entries, prices, links, updated), "text/html")
+        except Exception:
+            logging.warning("holdings page skipped: %s", traceback.format_exc())
         backtests = []
         backtests_png = None
         backtests_data = None

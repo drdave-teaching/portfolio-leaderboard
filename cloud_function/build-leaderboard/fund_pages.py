@@ -1,6 +1,7 @@
 # fund_pages.py: one public page per fund (click a nickname on the leaderboard).
 # Each page: the fund's value since it started vs its no-rules twin and the S&P 500, its Studio 5 backtest, and its
-# change history. No NetIDs, no emails, no holdings (only the featured fund shows holdings, on the main page).
+# change history, and (since Nov 17, Dr. Dave's call for Studio 6) what it holds: each stock, its share, and its
+# return since the class start (crowd.CROWD_START), green or red. No NetIDs, no emails.
 #
 # The page address is a hash of the NetID with a secret salt kept in the PRIVATE bucket (config/salt.txt), so nobody
 # can work out whose page is whose. Images and pages are only re-made when something changed (cheap to run often).
@@ -24,6 +25,7 @@ import page
 
 SALT_KEY = "config/salt.txt"
 STATE_KEY = "config/fund_pages_state.json"
+HOLDINGS_SINCE = "2026-11-05"      # the class start: returns on the fund pages are measured from this close
 
 
 def get_salt(bucket, read_text, write_text):
@@ -136,8 +138,45 @@ def theses_block(theses):
     return "".join(out)
 
 
+def holdings_rows(mix, prices, start_day):
+    """The fund's newest mix, biggest share first: [{ticker, share_pct, since_pct or None}]."""
+    start = pd.Timestamp(start_day)
+    out = []
+    for ticker in sorted(mix, key=lambda t: -mix[t]):
+        since = None
+        if ticker in prices.columns:
+            window = prices.loc[start:, ticker].dropna()
+            if len(window) >= 2:
+                since = 100 * (float(window.iloc[-1]) / float(window.iloc[0]) - 1)
+        out.append({"ticker": ticker, "share_pct": 100 * mix[ticker], "since_pct": since})
+    return out
+
+
+def holdings_block(holdings, start_day):
+    """What the fund holds: stock, share, and its return since the class start (green up, red down)."""
+    if not holdings:
+        return ""
+    label = pd.Timestamp(start_day).strftime("%b %d").replace(" 0", " ")
+    out = ["<h2>What it holds</h2><div class='tablebox'><table><tr><th class='l'>Stock</th><th>Share of the fund</th>"
+           "<th>Its return since %s</th></tr>" % html.escape(label)]
+    for item in holdings:
+        if item["since_pct"] is None:
+            cell = "<td>-</td>"
+        else:
+            strength = min(abs(item["since_pct"]) / 15.0, 1.0)          # full color at a 15% move
+            if item["since_pct"] >= 0:
+                color = "rgba(26,127,55,%.2f)" % (0.10 + 0.45 * strength)
+            else:
+                color = "rgba(180,35,24,%.2f)" % (0.10 + 0.45 * strength)
+            cell = "<td style='background:%s'>%+.1f%%</td>" % (color, item["since_pct"])
+        out.append("<tr><td class='l'><b>%s</b></td><td>%.1f%%</td>%s</tr>" % (
+            html.escape(item["ticker"]), item["share_pct"], cell))
+    out.append("</table></div>")
+    return "".join(out)
+
+
 def page_html(nickname, theme, row, waiting_label, history, has_value_png, backtest, has_backtest_png, window, updated,
-              backtest_note=None, theses=None):
+              backtest_note=None, theses=None, holdings=None, holdings_start=None):
     out = []
     out.append("<!doctype html><html lang='en'><head><meta charset='utf-8'>")
     out.append("<meta name='viewport' content='width=device-width, initial-scale=1'>")
@@ -160,6 +199,7 @@ def page_html(nickname, theme, row, waiting_label, history, has_value_png, backt
         out.append("<p class='note'>This fund starts at the close on %s. Its line shows up here after that close.</p>" %
                    html.escape(waiting_label))
     out.append(theses_block(theses))
+    out.append(holdings_block(holdings, holdings_start))
     out.append("<h2>Its backtest</h2>")
     out.append(page.backtest_block(backtest, has_backtest_png, window, nickname, backtest_note))
     out.append("<h2>Its history</h2><div class='tablebox'><table><tr><th class='l'>Received</th><th class='l'>Counts from the close on</th><th class='l'>Why</th></tr>")
@@ -230,14 +270,15 @@ def build(result, entries, prices, entries_bucket, public_bucket, read_text, wri
                             "counts_from": day.strftime("%a %b %d") if day is not None else "the next close",
                             "reason": str(entry.get("reason", ""))})
 
+        holds = holdings_rows(latest["portfolios"]["with_rules"], prices, HOLDINGS_SINCE)
         body = page_html(nickname, latest.get("theme", ""), rows.get(netid), waiting.get(netid, ""), history, value_src,
                          proof.get("backtest"), backtest_src, proof.get("data_window"), "", proof.get("backtest_note"),
-                         latest.get("theses"))
+                         latest.get("theses"), holds, HOLDINGS_SINCE)
         digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
         if before.get("page") != digest:
             full = page_html(nickname, latest.get("theme", ""), rows.get(netid), waiting.get(netid, ""), history, value_src,
                              proof.get("backtest"), backtest_src, proof.get("data_window"), updated,
-                             proof.get("backtest_note"), latest.get("theses"))
+                             proof.get("backtest_note"), latest.get("theses"), holds, HOLDINGS_SINCE)
             upload(public_bucket, "funds/%s.html" % slug, full, "text/html")
         # the private record (only rewritten when something in it changed)
         record = record_json(netid, mine, result, prices, trading_days, "")
