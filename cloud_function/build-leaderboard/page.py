@@ -343,8 +343,41 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
         out.append("<div class='tablebox'><table><tr><th>Rank</th><th class='l'>Fund</th><th class='l'>Theme</th>"
                    "<th class='l'>Stock list</th><th class='l'>Call</th><th>Value</th><th>Since start</th><th>Its no-rules twin</th><th>Rules vs no rules</th>"
                    "<th>vs S&amp;P 500</th><th>Worst drop</th><th>Stocks</th><th>Changes</th><th>Started</th></tr>")
+        # unranked rows (the S&P 500 and the crowd funds), slotted into the table by their value
+        unranked = []
+        spy = result["benchmark_path"]
+        if len(spy) > 1:
+            spy_value = 10000 * spy.iloc[-1] / spy.iloc[0]
+            spy_growth = 100 * (spy.iloc[-1] / spy.iloc[0] - 1)
+            spy_drop = -100 * (spy / spy.cummax() - 1).min()
+            spy_start = str(spy.index[0])[:10]
+            unranked.append((spy_value, "<tr style='background:#eef1f5'><td>–</td><td class='l fund'>S&amp;P 500 (SPY)</td>"
+                             "<td class='l theme'>the market: $10,000 in the S&amp;P 500</td><td class='l'>–</td><td class='l'>–</td>"
+                             "<td>$%s</td><td>%s</td><td>–</td><td>–</td><td>–</td><td>%s</td><td>500</td><td>–</td><td>%s</td></tr>" % (
+                                 "{:,.0f}".format(spy_value), pct(spy_growth), plain_pct(spy_drop), html.escape(spy_start))))
+        crowd_note = " The gray S&amp;P 500 row is not ranked: it is $10,000 in the S&amp;P 500 since the first fund started."
+        for key in ["crowd", "concentrated"]:
+            one = crowds.get(key)
+            if one is None or one.get("stats") is None:
+                continue
+            stats = one["stats"]
+            unranked.append((stats["value"], "<tr style='background:#f7f2fb'><td>–</td><td class='l fund'>%s</td><td class='l theme'>%s</td>"
+                             "<td class='l'>–</td><td class='l'>–</td><td>$%s</td><td>%s</td><td>–</td><td>–</td><td>–</td><td>%s</td>"
+                             "<td>%d</td><td>–</td><td>%s</td></tr>" % (
+                                 html.escape(one["name"]), "the average of %d %s funds" % (one["members"], "student" if key == "crowd" else "pair"),
+                                 "{:,.0f}".format(stats["value"]), pct(stats["growth_pct"]), plain_pct(stats["worst_drop_pct"]),
+                                 len(one["weights"]), html.escape(str(one["start"])))))
+            crowd_note = (" The shaded rows are not ranked: the S&amp;P 500 row is $10,000 in the S&amp;P 500 since the first fund started, "
+                          "and the class crowd fund is the average of every student's fund "
+                          "(each counts once, Dr. Dave's are left out), bought at the close on its start day and held. "
+                          "The 🎯 crowd does the same for the pairs' concentrated funds.")
+        unranked = sorted(unranked, key=lambda pair: -pair[0])
+        next_unranked = 0
         for i in range(len(board)):
             r = board.loc[i]
+            while next_unranked < len(unranked) and unranked[next_unranked][0] > r["with_rules_value"]:
+                out.append(unranked[next_unranked][1])
+                next_unranked += 1
             out.append("<tr><td>%d</td><td class='l fund'>%s</td><td class='l theme'>%s</td><td class='l'>%s</td><td class='l'>%s</td><td>$%s</td>"
                        "<td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>" % (
                            r["rank"], fund_name(r["nickname"], r["netid"], links), html.escape(str(r["theme"])),
@@ -353,20 +386,9 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
                            pct(r["no_rules_growth_pct"]), points(r["rules_minus_no_rules_pct"]),
                            points(r["rules_minus_spy_pct"]), plain_pct(r["with_rules_worst_drop_pct"]),
                            r["stocks_with_rules"], r["changes"], html.escape(str(r["started"]))))
-        crowd_note = ""
-        for key in ["crowd", "concentrated"]:
-            one = crowds.get(key)
-            if one is None or one.get("stats") is None:
-                continue
-            stats = one["stats"]
-            out.append("<tr style='background:#f7f2fb'><td>–</td><td class='l fund'>%s</td><td class='l theme'>%s</td><td class='l'>–</td>"
-                       "<td class='l'>–</td><td>$%s</td><td>%s</td><td>–</td><td>–</td><td>–</td><td>%s</td><td>%d</td><td>–</td><td>%s</td></tr>" % (
-                           html.escape(one["name"]), "the average of %d %s funds" % (one["members"], "student" if key == "crowd" else "pair"),
-                           "{:,.0f}".format(stats["value"]), pct(stats["growth_pct"]), plain_pct(stats["worst_drop_pct"]),
-                           len(one["weights"]), html.escape(str(one["start"]))))
-            crowd_note = (" The shaded rows are not ranked: the class crowd fund is the average of every student's fund "
-                          "(each counts once, Dr. Dave's are left out), bought at the close on its start day and held. "
-                          "The 🎯 crowd does the same for the pairs' concentrated funds.")
+        while next_unranked < len(unranked):
+            out.append(unranked[next_unranked][1])
+            next_unranked += 1
         out.append("</table></div>")
         out.append("<p class='note'>\"Rules vs no rules\" and \"vs S&amp;P 500\" are percentage points over the same days. "
                    "\"Worst drop\" is the biggest fall from a high point so far.%s</p>" % crowd_note)
