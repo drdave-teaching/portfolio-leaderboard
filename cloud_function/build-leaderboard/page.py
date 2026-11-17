@@ -345,9 +345,27 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
         out.append("<h2>The leaderboard (ranked by your fund: the portfolio with your rules)</h2>")
         out.append("<p class='note' style='font-size:15px'><a href='holdings.html'><b>Who holds what &rarr;</b></a> "
                    "every fund's stocks on one page, green or red since Nov 5. Click a fund's name for its own page.</p>")
+        top = board.loc[0]
+        top_spy = top["with_rules_growth_pct"] - top["rules_minus_spy_pct"]
+        out.append("<div class='note' style='margin:6px 0 12px'><b>How to read the columns.</b> Every fund starts with $10,000 at its first close."
+                   "<ul style='margin:6px 0 0 18px;padding:0'>"
+                   "<li><b>Value today</b>: what that $10,000 is worth at the last close.</li>"
+                   "<li><b>Fund's return since it started</b>: the same thing as a percent.</li>"
+                   "<li><b>Its no-rules twin's return</b>: the same stocks and the same risk limit, with no business rules.</li>"
+                   "<li><b>Fund minus twin</b>: the fund's return minus its twin's, in percentage points. Above zero: the fund is ahead of its twin.</li>"
+                   "<li><b>Fund minus S&amp;P 500</b>: the fund's return minus the S&amp;P 500's return over the same days, in percentage points. "
+                   "Above zero: the fund is ahead of the market.</li>"
+                   "<li><b>Worst drop</b>: the biggest fall from a high point so far.</li></ul>"
+                   "<div style='margin-top:6px'>Example, %s: the fund is %+.2f%% and its twin is %+.2f%%, so fund minus twin is "
+                   "%.2f &minus; (%.2f) = <b>%+.2f</b>. The S&amp;P 500 did %+.2f%% over the same days, so fund minus S&amp;P 500 is "
+                   "%.2f &minus; (%.2f) = <b>%+.2f</b>.</div></div>" % (
+                       html.escape(str(top["nickname"])), top["with_rules_growth_pct"], top["no_rules_growth_pct"],
+                       top["with_rules_growth_pct"], top["no_rules_growth_pct"], top["rules_minus_no_rules_pct"],
+                       top_spy, top["with_rules_growth_pct"], top_spy, top["rules_minus_spy_pct"]))
         out.append("<div class='tablebox'><table><tr><th>Rank</th><th class='l'>Fund</th><th class='l'>Theme</th>"
-                   "<th class='l'>Stock list</th><th class='l'>Call</th><th>Value</th><th>Since start</th><th>Its no-rules twin</th><th>Rules vs no rules</th>"
-                   "<th>vs S&amp;P 500</th><th>Worst drop</th><th>Stocks</th><th>Changes</th><th>Started</th></tr>")
+                   "<th class='l'>Stock list</th><th class='l'>Call</th><th>Value today</th><th>Fund's return since it started</th>"
+                   "<th>Its no-rules twin's return</th><th>Fund minus twin (points)</th>"
+                   "<th>Fund minus S&amp;P 500 (points)</th><th>Worst drop</th><th>Stocks held</th><th>Changes made</th><th>Started</th></tr>")
         # unranked rows (the S&P 500 and the crowd funds), slotted into the table by their value
         unranked = []
         spy = result["benchmark_path"]
