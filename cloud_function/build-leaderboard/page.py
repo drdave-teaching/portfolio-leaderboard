@@ -288,7 +288,7 @@ def fund_name(nickname, netid, links):
 
 
 def render(result, updated_et, chart_name="chart.png", featured=None, links=None, backtests=None,
-           backtests_chart=False, race_chart=True, race_data=None, backtests_data=None, crowds=None):
+           backtests_chart=False, race_chart=True, race_data=None, backtests_data=None, crowds=None, year_data=None):
     board = result["board"]
     crowds = crowds or {}
     pending = result["pending"]
@@ -443,6 +443,15 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
                 stock_list_label(r.get("stock_list")), r["stocks_with_rules"],
                 r["stocks_no_rules"], html.escape(str(r["starts"]))))
         out.append("</table></div>")
+
+    if year_data is not None:
+        out.append("<h2>2026 so far: before and after the funds went live</h2>")
+        out.append("<p class='note'>Each line is $10,000 in a fund's <b>current</b> stocks, bought at the Dec 31, 2025 close and held. "
+                   "The red dashed line is Nov 5, when the class funds went live. <b>Left of the line is a what-if</b>: the funds did "
+                   "not exist yet, and their stocks were chosen knowing how those months turned out, so most of them look good. "
+                   "<b>Right of the line is live</b>: nobody knew what would happen next. The black line is the S&amp;P 500. "
+                   "Click a fund to turn its line on or off.</p>")
+        out.append(interactive.block("year", year_data, None, "Every fund's current stocks through 2026"))
 
     if backtests is not None and len(backtests) > 0:
         out.append("<h2>Best backtests</h2>")

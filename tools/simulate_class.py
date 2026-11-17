@@ -263,6 +263,10 @@ open(os.path.join(OUT, "holdings.html"), "wb").write(BUCKETS["page"].store["hold
 assert "spy_growth_pct" in public_crowd["crowd"]["stats"] and "vs_spy_pct" in public_crowd["crowd"]["stats"]
 assert "the same dollars in each of" in BUCKETS["page"].store["index.html"].decode()
 print("holdings page OK; crowd vs S&P:", public_crowd["crowd"]["stats"]["vs_spy_pct"])
+index_text = BUCKETS["page"].store["index.html"].decode()
+assert "2026 so far: before and after the funds went live" in index_text and "lbChart('year'" in index_text
+assert '"marker":{"date":"2026-11-05"' in index_text
+print("2026-so-far chart OK")
 print("crowd OK:", public_crowd["crowd"]["members"], "funds,", public_crowd["crowd"]["stats"])
 open(os.path.join(OUT, "crowd.json"), "wb").write(BUCKETS["page"].store["crowd.json"])
 page_text = BUCKETS["page"].store["index.html"].decode()

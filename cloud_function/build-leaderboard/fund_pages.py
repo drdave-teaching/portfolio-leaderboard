@@ -377,3 +377,54 @@ def backtest_board(result, entries):
         plt.close(figure)
         png = buffer.getvalue()
     return rows, png, data
+
+
+YEAR_START = "2025-12-31"        # the "2026 so far" chart buys every fund at this close
+
+
+def year_so_far(result, entries, prices):
+    """Every fund's CURRENT mix (with rules), $10,000 bought at the Dec 31, 2025 close and held to the last close, in
+    leaderboard order, plus the S&P 500. A what-if before the funds went live (HOLDINGS_SINCE): the mixes were chosen
+    knowing how those months went. None until the price history reaches back to the start of the year."""
+    board = result["board"]
+    prices = prices.sort_index().ffill()
+    if len(board) == 0 or len(prices) == 0 or prices.index.min() > pd.Timestamp(YEAR_START) + pd.Timedelta(days=5):
+        return None
+    start = None
+    for day in prices.index:
+        if pd.Timestamp(day) >= pd.Timestamp(YEAR_START):
+            start = pd.Timestamp(day)
+            break
+    if start is None:
+        return None
+    latest = {}
+    for entry in entries:
+        netid = entry.get("netid")
+        if netid not in latest or entry["received_utc"] > latest[netid]["received_utc"]:
+            latest[netid] = entry
+
+    def as_dict(path):
+        out = {}
+        for day in path.index:
+            out[pd.Timestamp(day).strftime("%Y-%m-%d")] = float(path.loc[day])
+        return out
+
+    named = []
+    for i in range(len(board)):
+        netid = board.loc[i, "netid"]
+        if netid not in latest:
+            continue
+        path, _ = scoring.value_path([(start, latest[netid]["portfolios"]["with_rules"])], prices)
+        if len(path) >= 2:
+            named.append((str(board.loc[i, "nickname"]), as_dict(path)))
+    if len(named) == 0:
+        return None
+    spy_path, _ = scoring.value_path([(start, {scoring.BENCHMARK: 1.0})], prices)
+    data = interactive.paths_data(named, as_dict(spy_path))
+    if data is None:
+        return None
+    live = pd.Timestamp(HOLDINGS_SINCE)
+    data["marker"] = {"date": live.strftime("%Y-%m-%d"),
+                      "label": "%s: funds went live" % live.strftime("%b %d").replace(" 0", " "),
+                      "before": "what-if (with hindsight)", "after": "live"}
+    return data

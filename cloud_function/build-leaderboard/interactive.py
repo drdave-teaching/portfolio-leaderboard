@@ -131,6 +131,13 @@ function lbChart(id, data, startOn) {
     function Y(v) { return T + (H - T - B) * (hi - v) / (hi - lo); }
     geom = {X: X, Y: Y, L: L, R: R, W: W, H: H, T: T, B: B, m: m};
 
+    // a marker day (the day the funds went live): shade the days before it, and draw a dashed line on it
+    var markX = null;
+    if (data.marker) {
+      for (var q3 = 0; q3 < m; q3++) { if (data.dates[q3] >= data.marker.date) { markX = X(q3); break; } }
+      if (markX !== null) { svg.appendChild(sv('rect', {x: L, y: T, width: Math.max(markX - L, 0), height: H - T - B, fill: '#f1f3f6'})); }
+    }
+
     // y grid + labels
     var raw = (hi - lo) / 5, mag = Math.pow(10, Math.floor(Math.log10(raw))), step = mag;
     var steps = [1, 2, 2.5, 5, 10];
@@ -150,6 +157,22 @@ function lbChart(id, data, startOn) {
       svg.appendChild(tx);
     }
     svg.appendChild(sv('line', {x1: L, x2: W - R, y1: H - B, y2: H - B, stroke: '#cfd6df'}));
+    if (markX !== null) {
+      svg.appendChild(sv('line', {x1: markX, x2: markX, y1: T, y2: H - B, stroke: '#b42318', 'stroke-width': 2, 'stroke-dasharray': '7 5'}));
+      var ml = sv('text', {x: markX - 6, y: T + 13, 'text-anchor': 'end', 'font-size': 11.5, 'font-weight': 600, fill: '#b42318'});
+      ml.textContent = data.marker.label;
+      svg.appendChild(ml);
+      if (data.marker.before) {
+        var mb = sv('text', {x: L + 8, y: H - B - 8, 'font-size': 11, fill: '#5b6b80'});
+        mb.textContent = data.marker.before;
+        svg.appendChild(mb);
+      }
+      if (data.marker.after && W - R - markX > 34) {
+        var ma = sv('text', {x: markX + 5, y: H - B - 8, 'font-size': 11, fill: '#5b6b80'});
+        ma.textContent = data.marker.after;
+        svg.appendChild(ma);
+      }
+    }
 
     function line(vals, stroke, width, dashes, opacity) {
       var d = '', pen = false;

@@ -41,6 +41,7 @@ FETCH_STATE_KEY = "prices/last_fetch.json"
 ROSTER_KEY = "roster/allowed_netids.csv"
 NICKNAMES_KEY = "config/nicknames.json"   # optional, PRIVATE: {"netid": "Better fund name", ...} renames a fund everywhere
 PRICE_HISTORY_DAYS = 14          # fetch from this many days before the first entry
+YEAR_PRICES_FROM = "2025-12-30"  # ... and never later than this: the "2026 so far" chart holds every fund from Dec 31, 2025
 REFETCH_MINUTES = 120            # after a fetch, wait at least this long before asking Yahoo again
 EASTERN = ZoneInfo("America/New_York")
 
@@ -147,6 +148,7 @@ def get_prices(bucket, tickers, first_entry_utc, now_utc):
         cached = cached[cached.index <= last_close]
 
     start_day = pd.Timestamp(first_entry_utc).tz_localize(None).normalize() - pd.Timedelta(days=PRICE_HISTORY_DAYS)
+    start_day = min(start_day, pd.Timestamp(YEAR_PRICES_FROM))
     needed = set(tickers)
     stale = cached is None
     if cached is not None:
@@ -265,6 +267,12 @@ def build_http(request):
                 blob.upload_from_string(backtests_png, content_type="image/png")
         except Exception:
             logging.warning("backtest board skipped: %s", traceback.format_exc())
+        # "2026 so far": every fund's current mix held from Dec 31, 2025, with a line where the funds went live
+        year_data = None
+        try:
+            year_data = fund_pages.year_so_far(result, entries, prices)
+        except Exception:
+            logging.warning("2026-so-far chart skipped: %s", traceback.format_exc())
         crowds = {"crowd": None, "concentrated": None}
         try:
             crowds = crowd.build(entries, prices, entries_bucket, read_text, now_utc, updated)
@@ -288,7 +296,8 @@ def build_http(request):
         write_text(public_bucket, "index.html", page.render(result, updated, featured=featured, links=links, backtests=backtests,
                                                                 backtests_chart=backtests_png is not None,
                                                                 race_chart=race_chart is not None, race_data=race_data,
-                                                                backtests_data=backtests_data, crowds=crowds), "text/html")
+                                                                backtests_data=backtests_data, crowds=crowds,
+                                                                year_data=year_data), "text/html")
 
         summary = {"ok": True, "entries": len(entries), "funds_live": len(result["board"]),
                    "funds_waiting": len(result["pending"]), "last_close": result["last_close"],
