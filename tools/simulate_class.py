@@ -260,7 +260,9 @@ who = BUCKETS["page"].store["holdings.html"].decode()
 assert "Tech Titans" in who and "Who holds what" in who and "abc12345" not in who and "@example.com" not in who
 assert "holdings.html" in BUCKETS["page"].store["index.html"].decode()
 open(os.path.join(OUT, "holdings.html"), "wb").write(BUCKETS["page"].store["holdings.html"])
-print("holdings page OK")
+assert "spy_growth_pct" in public_crowd["crowd"]["stats"] and "vs_spy_pct" in public_crowd["crowd"]["stats"]
+assert "the same dollars in each of" in BUCKETS["page"].store["index.html"].decode()
+print("holdings page OK; crowd vs S&P:", public_crowd["crowd"]["stats"]["vs_spy_pct"])
 print("crowd OK:", public_crowd["crowd"]["members"], "funds,", public_crowd["crowd"]["stats"])
 open(os.path.join(OUT, "crowd.json"), "wb").write(BUCKETS["page"].store["crowd.json"])
 page_text = BUCKETS["page"].store["index.html"].decode()

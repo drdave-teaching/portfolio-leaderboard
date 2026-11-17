@@ -111,6 +111,12 @@ def one_crowd(mixes, prices, start_day, name):
     out["path"] = path
     if len(path) > 0:
         out["stats"] = scoring.path_stats(path)
+        # the S&P 500 over the same days, so the crowd can be compared with the market
+        spy_path, _ = scoring.value_path([(start, {scoring.BENCHMARK: 1.0})], prices)
+        if len(spy_path) > 0:
+            spy_growth = 100 * (float(spy_path.iloc[-1]) / float(spy_path.iloc[0]) - 1)
+            out["stats"]["spy_growth_pct"] = round(spy_growth, 2)
+            out["stats"]["vs_spy_pct"] = round(out["stats"]["growth_pct"] - spy_growth, 2)
     return out
 
 

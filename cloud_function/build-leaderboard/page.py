@@ -331,8 +331,11 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
     for key in ["crowd", "concentrated"]:
         one = crowds.get(key)
         if one is not None and one.get("stats") is not None:
-            out.append("<div class='card'><div class='big'>%s</div><div class='lab'>%s since %s (%d funds)</div></div>" % (
-                pct(one["stats"]["growth_pct"]), html.escape(one["name"]), html.escape(str(one["start"])), one["members"]))
+            versus = ""
+            if one["stats"].get("spy_growth_pct") is not None:
+                versus = " · S&amp;P 500, same days: %+.2f%%" % one["stats"]["spy_growth_pct"]
+            out.append("<div class='card'><div class='big'>%s</div><div class='lab'>%s since %s (%d funds)%s</div></div>" % (
+                pct(one["stats"]["growth_pct"]), html.escape(one["name"]), html.escape(str(one["start"])), one["members"], versus))
     out.append("</div>")
 
     if featured is not None:
@@ -364,14 +367,17 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
                 continue
             stats = one["stats"]
             unranked.append((stats["value"], "<tr style='background:#f7f2fb'><td>–</td><td class='l fund'>%s</td><td class='l theme'>%s</td>"
-                             "<td class='l'>–</td><td class='l'>–</td><td>$%s</td><td>%s</td><td>–</td><td>–</td><td>–</td><td>%s</td>"
+                             "<td class='l'>–</td><td class='l'>–</td><td>$%s</td><td>%s</td><td>–</td><td>–</td><td>%s</td><td>%s</td>"
                              "<td>%d</td><td>–</td><td>%s</td></tr>" % (
-                                 html.escape(one["name"]), "the average of %d %s funds" % (one["members"], "student" if key == "crowd" else "pair"),
-                                 "{:,.0f}".format(stats["value"]), pct(stats["growth_pct"]), plain_pct(stats["worst_drop_pct"]),
+                                 html.escape(one["name"]), "the same dollars in each of %d %s funds" % (one["members"], "student" if key == "crowd" else "pair"),
+                                 "{:,.0f}".format(stats["value"]), pct(stats["growth_pct"]),
+                                 points(stats.get("vs_spy_pct")) if stats.get("vs_spy_pct") is not None else "–",
+                                 plain_pct(stats["worst_drop_pct"]),
                                  len(one["weights"]), html.escape(str(one["start"])))))
             crowd_note = (" The shaded rows are not ranked: the S&amp;P 500 row is $10,000 in the S&amp;P 500 since the first fund started, "
-                          "and the class crowd fund is the average of every student's fund "
-                          "(each counts once, Dr. Dave's are left out), bought at the close on its start day and held. "
+                          "and the class crowd fund is what you would have if you put the same number of dollars in every "
+                          "student's fund (each counts once, Dr. Dave's are left out) at the close on its start day and held. "
+                          "Its \"vs S&amp;P 500\" compares it with the S&amp;P 500 over those same days. "
                           "The 🎯 crowd does the same for the pairs' concentrated funds.")
         unranked = sorted(unranked, key=lambda pair: -pair[0])
         next_unranked = 0
