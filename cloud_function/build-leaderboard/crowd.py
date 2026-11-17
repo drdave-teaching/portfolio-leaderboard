@@ -1,7 +1,7 @@
 # crowd.py: the class crowd fund (Studio 6).
 #
-# The crowd fund is the average of every STUDENT's diversified fund (their latest Studio 5 mix, with rules), each
-# student counting equally, bought at the close on CROWD_START and held. Dr. Dave's funds (dww05002, zzz*) and any
+# The crowd fund is the average of every STUDENT's diversified fund (their latest Studio 5 mix, with rules; Studio 6
+# decisions do not change it), each student counting equally, bought at the close on CROWD_START and held. Dr. Dave's funds (dww05002, zzz*) and any
 # NetID listed in the PRIVATE config/crowd_exclude.txt are left out. Entries received after FREEZE_UTC do not change the
 # crowd (the funds still race on the board).
 #
@@ -47,6 +47,7 @@ def read_excluded(bucket, read_text):
 def members(entries, concentrated, excluded):
     """{fund id: that fund's latest with-rules mix received before the freeze}."""
     latest = {}
+    managed = {}      # a student's first Studio 6 decision: only used when they have no Studio 5 fund at all
     for entry in entries:
         netid = str(entry.get("netid", ""))
         is_concentrated = netid.endswith(CONCENTRATED_SUFFIX)
@@ -56,8 +57,17 @@ def members(entries, concentrated, excluded):
             continue
         if entry["received_utc"] > FREEZE_UTC:
             continue
+        if not concentrated and entry.get("notebook") == "studio6":
+            # the crowd is the class's Studio 5 funds, held: a Studio 6 decision (hold / refresh / change) is that
+            # manager's own move, and must not move the benchmark everyone is compared with
+            if netid not in managed or entry["received_utc"] < managed[netid]["received_utc"]:
+                managed[netid] = entry
+            continue
         if netid not in latest or entry["received_utc"] > latest[netid]["received_utc"]:
             latest[netid] = entry
+    for netid in managed:
+        if netid not in latest:
+            latest[netid] = managed[netid]
     mixes = {}
     for netid in latest:
         mixes[netid] = latest[netid]["portfolios"]["with_rules"]

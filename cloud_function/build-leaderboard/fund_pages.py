@@ -66,6 +66,8 @@ def record_json(netid, mine, result, prices, trading_days, updated):
             "fund_kind": entry.get("fund_kind", "diversified"),
             "theses": entry.get("theses"),
             "partner_netid": entry.get("partner_netid"),
+            "decision": entry.get("decision"),
+            "data_window": entry.get("data_window"),
         })
     values = {"dates": [], "with_rules": [], "no_rules": []}
     spy = {"dates": [], "values": []}
@@ -202,12 +204,18 @@ def build(result, entries, prices, entries_bucket, public_bucket, read_text, wri
         last_close = result["last_close"]
         before = state.get(netid, {})
 
+        # the backtest shown is the newest one the student sent: a Studio 6 decision has none, and must not erase it
+        proof = latest
+        for entry in mine:
+            if isinstance(entry.get("backtest"), dict) and len(entry["backtest"]) > 0:
+                proof = entry
+
         backtest_src = None
-        paths = latest.get("backtest_paths")
+        paths = proof.get("backtest_paths")
         if isinstance(paths, dict) and len(paths) > 0:
             backtest_src = "%s_backtest.png?v=%s" % (slug, hashlib.sha256(str(mark).encode()).hexdigest()[:8])
             if before.get("backtest_for") != mark:
-                upload(public_bucket, "funds/%s_backtest.png" % slug, live.make_backtest_chart(paths, nickname, latest.get("backtest_title")), "image/png")
+                upload(public_bucket, "funds/%s_backtest.png" % slug, live.make_backtest_chart(paths, nickname, proof.get("backtest_title")), "image/png")
         value_src = None
         if netid in rows:
             value_src = "%s_value.png?v=%s" % (slug, last_close)
@@ -223,13 +231,13 @@ def build(result, entries, prices, entries_bucket, public_bucket, read_text, wri
                             "reason": str(entry.get("reason", ""))})
 
         body = page_html(nickname, latest.get("theme", ""), rows.get(netid), waiting.get(netid, ""), history, value_src,
-                         latest.get("backtest"), backtest_src, latest.get("data_window"), "", latest.get("backtest_note"),
+                         proof.get("backtest"), backtest_src, proof.get("data_window"), "", proof.get("backtest_note"),
                          latest.get("theses"))
         digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
         if before.get("page") != digest:
             full = page_html(nickname, latest.get("theme", ""), rows.get(netid), waiting.get(netid, ""), history, value_src,
-                             latest.get("backtest"), backtest_src, latest.get("data_window"), updated,
-                             latest.get("backtest_note"), latest.get("theses"))
+                             proof.get("backtest"), backtest_src, proof.get("data_window"), updated,
+                             proof.get("backtest_note"), latest.get("theses"))
             upload(public_bucket, "funds/%s.html" % slug, full, "text/html")
         # the private record (only rewritten when something in it changed)
         record = record_json(netid, mine, result, prices, trading_days, "")
@@ -268,6 +276,9 @@ def backtest_board(result, entries):
     latest = {}
     for entry in entries:
         netid = entry.get("netid")
+        backtest = entry.get("backtest")
+        if not isinstance(backtest, dict) or not isinstance(backtest.get("with your rules"), dict):
+            continue          # a Studio 6 decision carries no backtest: keep the fund's last real one
         if netid in keep and (netid not in latest or entry["received_utc"] > latest[netid]["received_utc"]):
             latest[netid] = entry
     rows = []

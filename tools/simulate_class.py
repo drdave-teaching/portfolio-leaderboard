@@ -192,6 +192,19 @@ for netid, name, picks in [("abc12345", "Costco Believers", {"COST": 0.4, "AAPL"
     BUCKETS["entries"].blob("submissions/%s-c/2026-10-27T23-30-00Z.json" % netid).upload_from_string(json.dumps(entry))
 save("zzz00009", "Dr. Dave demo", "demo", "2026-10-07T23:30:00Z", {"TSLA": 1.0}, {"TSLA": 1.0})
 if crowd > 0:
+    # a Studio 6 decision (Nov 17 rework): sim00001 changes the fund from the Studio 6 notebook. No backtest is sent.
+    # The crowd must keep the Studio 5 mix, and the fund's Studio 5 backtest must stay on its page and the board.
+    decided = {"netid": "sim00001", "nickname": "Student fund 2", "theme": "pretend theme 2",
+               "reason": "Studio 6 (change): moved into two stocks after the drop", "received_utc": "2026-10-28T23:30:00Z",
+               "google_email": "sim00001@example.com", "notebook": "studio6", "decision": "change",
+               "portfolios": {"no_rules": {"SBUX": 1.0}, "with_rules": {"SBUX": 0.5, "MCD": 0.5}}}
+    BUCKETS["entries"].blob("submissions/sim00001/2026-10-28T23-30-00Z.json").upload_from_string(json.dumps(decided))
+    # ... and a student whose FIRST fund comes from the Studio 6 notebook still joins the crowd
+    first = {"netid": "new00001", "nickname": "Launched in Studio 6", "theme": "late start",
+             "reason": "Studio 6 (refresh): first fund", "received_utc": "2026-10-28T23:40:00Z",
+             "google_email": "new00001@example.com", "notebook": "studio6", "decision": "refresh",
+             "portfolios": {"no_rules": {"HD": 1.0}, "with_rules": {"HD": 0.5, "UNH": 0.5}}}
+    BUCKETS["entries"].blob("submissions/new00001/2026-10-28T23-40-00Z.json").upload_from_string(json.dumps(first))
     # Dr. Dave renames one fund without anyone resubmitting
     BUCKETS["entries"].blob("config/nicknames.json").upload_from_string(json.dumps({"sim00000": "Renamed by Dr. Dave"}))
 
@@ -205,10 +218,26 @@ store = BUCKETS["entries"].store
 for key in ["class/leaderboard_private.csv", "class/daily_values.csv", "class/entries_log.csv", "prices/daily_closes.csv"]:
     assert key in store, key
 public_crowd = json.loads(BUCKETS["page"].store["crowd.json"].decode())
-assert public_crowd["crowd"]["members"] == 4 + crowd, public_crowd["crowd"]["members"]      # 4 students, no demo, no 🎯
+late = 1 if crowd > 0 else 0          # the student who launched from the Studio 6 notebook
+assert public_crowd["crowd"]["members"] == 4 + crowd + late, public_crowd["crowd"]["members"]      # no demo, no 🎯
+if crowd > 0:
+    studio5_mix = json.loads(store["submissions/sim00001/2026-10-14T21-00-00Z.json"].decode())["portfolios"]["with_rules"]
+    assert studio5_mix in public_crowd["funds"], "the crowd lost sim00001's Studio 5 mix"
+    assert {"SBUX": 0.5, "MCD": 0.5} not in public_crowd["funds"], "a Studio 6 decision moved the crowd"
+    assert {"HD": 0.5, "UNH": 0.5} in public_crowd["funds"], "a first fund sent from Studio 6 should join the crowd"
+    board_text = BUCKETS["page"].store["index.html"].decode()
+    kept = 0
+    for name in BUCKETS["page"].store:
+        if name.startswith("funds/") and name.endswith(".html"):
+            text = BUCKETS["page"].store[name].decode()
+            if "Studio 6 (change): moved into two stocks" in text:
+                assert "No backtest was sent" not in text, "the Studio 6 decision erased the Studio 5 backtest"
+                kept += 1
+    assert kept == 1, kept
+    print("Studio 6 decision OK: crowd unchanged, backtest kept")
 assert public_crowd["concentrated_crowd"]["members"] == 2
 assert "TSLA" not in public_crowd["crowd"]["weights"]
-assert len(public_crowd["funds"]) == 4 + crowd and len(public_crowd["concentrated_funds"]) == 2
+assert len(public_crowd["funds"]) == 4 + crowd + late and len(public_crowd["concentrated_funds"]) == 2
 total = 0
 for t in public_crowd["crowd"]["weights"]:
     total += public_crowd["crowd"]["weights"][t]
