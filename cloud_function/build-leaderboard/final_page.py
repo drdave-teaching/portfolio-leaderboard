@@ -14,7 +14,7 @@ import holdings_page
 import interactive
 import page
 
-RACE_ENDS = "Thursday, Dec 3"
+RACE_ENDS = "Wednesday, Dec 2"
 
 
 def chips(mix, since):
@@ -85,7 +85,7 @@ def render(final, entries, prices, links, updated, class_fund=None):
     if len(board) > 0 and len(class_path) > 1:
         class_growth = 100 * (class_path.iloc[-1] / class_path.iloc[0] - 1)
         out.append("<div class='card'><div class='big'>%s</div><div class='lab'>the class fund since the first final fund started</div></div>" % page.pct(class_growth))
-    out.append("<div class='card'><div class='big'>Dec 3</div><div class='lab'>the race ends at this market close</div></div>")
+    out.append("<div class='card'><div class='big'>Dec 2</div><div class='lab'>the race ends at this market close</div></div>")
     out.append("</div>")
 
     out.append("<p class='note' style='font-size:15px'><b>Only final funds are here</b>: funds sent from the Studio 6 notebook, "
