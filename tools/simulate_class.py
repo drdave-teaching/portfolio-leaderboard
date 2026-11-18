@@ -307,6 +307,13 @@ record_key = titans["record"].split("/page/")[-1] if "/page/" in titans["record"
 assert record_key in BUCKETS["page"].store, record_key
 assert "abc12345" not in json.dumps(index)
 print("fund_records.json OK:", len(index_names), "funds listed by name")
+market = BUCKETS["page"].store["market.html"].decode()
+assert "The market: the 100 biggest companies" in market and market.count("class='sq'") == 100, market.count("class='sq'")
+assert "class='held'>3<" in market, "NVDA should show 3 final funds holding it"
+assert "What the final funds hold most" in market and "FINAL: Chips and Steady" in market
+assert "abc12345" not in market and "market.html" in front
+open(os.path.join(OUT, "market.html"), "wb").write(BUCKETS["page"].store["market.html"])
+print("market tab OK: 100 squares")
 print("crowd OK:", public_crowd["crowd"]["members"], "funds,", public_crowd["crowd"]["stats"])
 open(os.path.join(OUT, "crowd.json"), "wb").write(BUCKETS["page"].store["crowd.json"])
 page_text = BUCKETS["page"].store["studio5.html"].decode()

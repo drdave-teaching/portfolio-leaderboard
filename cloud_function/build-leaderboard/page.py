@@ -54,9 +54,9 @@ TABS_CSS = """
 
 
 def tabs(active, up=""):
-    """The tab bar on every page. active: 'final', 'studio5' or 'holdings'. up: '../' from inside a folder."""
+    """The tab bar on every page. active: 'final', 'studio5', 'holdings' or 'market'. up: '../' from inside a folder."""
     names = [("final", "index.html", "Final project"), ("studio5", "studio5.html", "Studio 5 funds (practice)"),
-             ("holdings", "holdings.html", "Who holds what (Studio 5)")]
+             ("holdings", "holdings.html", "Who holds what (Studio 5)"), ("market", "market.html", "The market")]
     out = ["<style>%s</style><div class='tabs'>" % TABS_CSS]
     for key, href, label in names:
         out.append("<a href='%s%s'%s>%s</a>" % (up, href, " class='on'" if key == active else "", label))

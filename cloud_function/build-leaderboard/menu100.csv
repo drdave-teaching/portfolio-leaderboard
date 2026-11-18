@@ -1,0 +1,101 @@
+ticker,company,sector,market_value_billions
+NVDA,Nvidia,Technology,4540.7
+AAPL,Apple Inc.,Technology,4034.5
+GOOGL,Alphabet Inc. (Class A),Communication Services,3791.1
+MSFT,Microsoft,Technology,3594.8
+AMZN,Amazon,Consumer Discretionary,2467.5
+META,Meta Platforms,Communication Services,1663.8
+AVGO,Broadcom,Technology,1641.0
+TSLA,"Tesla, Inc.",Consumer Discretionary,1495.7
+BRK-B,Berkshire Hathaway,Financials,1084.4
+LLY,Lilly (Eli),Health Care,963.4
+WMT,Walmart,Consumer Staples,888.3
+JPM,JPMorgan Chase,Financials,886.0
+V,Visa Inc.,Financials,676.8
+ORCL,Oracle Corporation,Technology,560.0
+MA,Mastercard,Financials,516.1
+XOM,ExxonMobil,Energy,513.0
+JNJ,Johnson & Johnson,Health Care,498.6
+PLTR,Palantir Technologies,Technology,423.7
+BAC,Bank of America,Financials,407.4
+ABBV,AbbVie,Health Care,403.8
+NFLX,Netflix,Communication Services,397.3
+COST,Costco,Consumer Staples,382.8
+AMD,Advanced Micro Devices,Technology,348.7
+HD,Home Depot (The),Consumer Discretionary,342.6
+PG,Procter & Gamble,Consumer Staples,335.4
+GE,GE Aerospace,Industrials,326.6
+MU,Micron Technology,Technology,321.2
+CVX,Chevron Corporation,Energy,307.1
+CSCO,Cisco,Technology,304.4
+KO,Coca-Cola Company (The),Consumer Staples,300.9
+UNH,UnitedHealth Group,Health Care,299.0
+WFC,Wells Fargo,Financials,298.6
+MS,Morgan Stanley,Financials,283.4
+IBM,IBM,Technology,276.9
+CAT,Caterpillar Inc.,Industrials,268.4
+GS,Goldman Sachs,Financials,266.1
+MRK,Merck & Co.,Health Care,262.9
+AXP,American Express,Financials,257.4
+CRM,Salesforce,Technology,252.2
+PM,Philip Morris International,Consumer Staples,249.7
+RTX,RTX Corporation,Industrials,245.9
+TMUS,T-Mobile US,Communication Services,228.5
+APP,AppLovin,Technology,227.9
+ABT,Abbott Laboratories,Health Care,218.1
+MCD,McDonald's,Consumer Discretionary,218.1
+TMO,Thermo Fisher Scientific,Health Care,217.7
+LRCX,Lam Research,Technology,215.9
+C,Citigroup,Financials,214.8
+AMAT,Applied Materials,Technology,204.7
+DIS,Walt Disney Company (The),Communication Services,204.6
+ISRG,Intuitive Surgical,Health Care,203.0
+LIN,Linde plc,Materials,199.9
+PEP,PepsiCo,Consumer Staples,196.5
+BX,Blackstone Inc.,Financials,189.1
+QCOM,Qualcomm,Technology,184.6
+INTU,Intuit,Technology,184.4
+SCHW,Charles Schwab Corporation,Financials,181.4
+GEV,GE Vernova,Industrials,177.9
+T,AT&T,Communication Services,177.6
+AMGN,Amgen,Health Care,176.3
+INTC,Intel,Technology,176.0
+VZ,Verizon,Communication Services,171.7
+TJX,TJX Companies,Consumer Discretionary,171.0
+UBER,Uber,Industrials,170.4
+BA,Boeing,Industrials,170.0
+NEE,NextEra Energy,Utilities,167.2
+ACN,Accenture,Technology,166.4
+BLK,BlackRock,Financials,166.1
+ANET,Arista Networks,Technology,165.0
+DHR,Danaher Corporation,Health Care,163.9
+NOW,ServiceNow,Technology,159.1
+TXN,Texas Instruments,Technology,157.7
+COF,Capital One,Financials,155.0
+GILD,Gilead Sciences,Health Care,152.3
+SPGI,S&P Global,Financials,150.9
+ADBE,Adobe Inc.,Technology,148.5
+PFE,Pfizer,Health Care,141.6
+BSX,Boston Scientific,Health Care,141.4
+HON,Honeywell,Industrials,137.9
+UNP,Union Pacific Corporation,Industrials,137.2
+LOW,Lowe's,Consumer Discretionary,135.3
+SYK,Stryker Corporation,Health Care,134.4
+PGR,Progressive Corporation,Financials,133.5
+ADI,Analog Devices,Technology,132.8
+PANW,Palo Alto Networks,Technology,128.4
+WELL,Welltower,Real Estate,127.4
+DE,Deere & Company,Industrials,125.9
+CB,Chubb Limited,Financials,124.4
+ETN,Eaton Corporation,Industrials,124.0
+MDT,Medtronic,Health Care,123.2
+PLD,Prologis,Real Estate,118.6
+KKR,KKR & Co.,Financials,118.0
+COP,ConocoPhillips,Energy,116.9
+VRTX,Vertex Pharmaceuticals,Health Care,116.2
+LMT,Lockheed Martin,Industrials,112.9
+PH,Parker Hannifin,Industrials,111.2
+CEG,Constellation Energy,Utilities,110.4
+BMY,Bristol Myers Squibb,Health Care,109.8
+NEM,Newmont,Materials,109.7
+IBKR,Interactive Brokers,Financials,109.3

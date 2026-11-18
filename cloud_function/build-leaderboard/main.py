@@ -33,6 +33,7 @@ import fund_pages
 import holdings_page
 import interactive
 import live
+import market_page
 import page
 
 ENTRIES_BUCKET = os.getenv("ENTRIES_BUCKET", "")
@@ -236,6 +237,10 @@ def build_http(request):
         for entry in entries:
             for key in scoring.PORTFOLIO_KEYS:
                 tickers = tickers | set(entry["portfolios"][key].keys())
+        try:
+            tickers = tickers | market_page.tickers()          # the 100 biggest companies, for "The market" tab
+        except Exception:
+            logging.warning("market menu not loaded: %s", traceback.format_exc())
 
         prices = None
         if len(entries) > 0:
@@ -351,6 +356,11 @@ def build_http(request):
             write_text(public_bucket, "index.html", final_page.render(final, entries, prices, links, updated), "text/html")
         except Exception:
             logging.warning("final page skipped: %s", traceback.format_exc())
+        # "The market": the 100-company quilt, with how many final funds hold each stock
+        try:
+            write_text(public_bucket, "market.html", market_page.render(final, entries, prices, links, updated), "text/html")
+        except Exception:
+            logging.warning("market page skipped: %s", traceback.format_exc())
         write_text(public_bucket, "studio5.html", page.render(practice, updated, featured=featured, links=links, backtests=backtests,
                                                                 backtests_chart=backtests_png is not None,
                                                                 race_chart=race_chart is not None, race_data=race_data,
