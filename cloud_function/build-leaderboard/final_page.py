@@ -124,7 +124,7 @@ def render(final, entries, prices, links, updated):
                    "<b>Fund minus S&amp;P 500</b>: that return minus the S&amp;P 500's over the same days, in percentage points. "
                    "<b>Worst drop</b>: the biggest fall from a high point so far. Each stock shows its share of the fund%s. "
                    "The gray S&amp;P 500 row is not ranked.</p>" % (
-                       " and its return since the race began, green up and red down" if len(since) > 0 else ""))
+                       " and its return since the race began, blue up and red down" if len(since) > 0 else ""))
 
         race = interactive.race_data(final["values"], board, final["benchmark_path"], [])
         if race is not None:

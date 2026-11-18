@@ -364,7 +364,7 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
     if n_live > 0:
         out.append("<h2>The leaderboard (ranked by your fund: the portfolio with your rules)</h2>")
         out.append("<p class='note' style='font-size:15px'><a href='holdings.html'><b>Who holds what &rarr;</b></a> "
-                   "every fund's stocks on one page, green or red since Nov 5. Click a fund's name for its own page.</p>")
+                   "every fund's stocks on one page, blue or red since Nov 5. Click a fund's name for its own page.</p>")
         top = board.loc[0]
         top_spy = top["with_rules_growth_pct"] - top["rules_minus_spy_pct"]
         out.append("<div class='note' style='margin:6px 0 12px'><b>How to read the columns.</b> Every fund starts with $10,000 at its first close."

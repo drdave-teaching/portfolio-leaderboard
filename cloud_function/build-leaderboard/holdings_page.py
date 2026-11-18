@@ -1,7 +1,7 @@
 # holdings_page.py: "Who holds what" (holdings.html), one public page for the whole class (Studio 6, Nov 17).
 #
 # Every fund on the board, in rank order, with the stocks it holds today's mix of. Each stock is colored by its return
-# since the class start (fund_pages.HOLDINGS_SINCE): green went up, red went down, stronger color = bigger move. Below
+# since the class start (fund_pages.HOLDINGS_SINCE): blue went up, red went down, stronger color = bigger move. Below
 # that, every stock and which funds hold it. Fund nicknames only: no NetIDs, no emails, no real names.
 
 import html
@@ -21,12 +21,12 @@ td.holds { text-align:left; white-space:normal; min-width:420px; }
 
 
 def shade(since_pct):
-    """A background color for a return: green up, red down, full strength at a 15% move, gray when unknown."""
+    """A background color for a return: blue up, red down, full strength at a 15% move, gray when unknown."""
     if since_pct is None:
         return "rgba(0,0,0,0.05)"
     strength = min(abs(since_pct) / 15.0, 1.0)
     if since_pct >= 0:
-        return "rgba(26,127,55,%.2f)" % (0.10 + 0.50 * strength)
+        return "rgba(33,102,172,%.2f)" % (0.10 + 0.50 * strength)
     return "rgba(180,35,24,%.2f)" % (0.10 + 0.50 * strength)
 
 
