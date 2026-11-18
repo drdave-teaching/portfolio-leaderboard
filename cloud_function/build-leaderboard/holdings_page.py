@@ -61,6 +61,7 @@ def render(result, entries, prices, links, updated):
     out.append("<header><div class='wrap'><div class='sub'><a href='index.html' style='color:#c9d6ea'>&larr; the class leaderboard</a></div>")
     out.append("<h1>Who holds what</h1><div class='sub'>every fund on the board and its stocks · updated %s</div></div></header>" % html.escape(updated))
     out.append("<div class='wrap'>")
+    out.append(page.tabs("holdings"))
     out.append("<p class='note key'>Each stock shows its share of the fund and its return since the %s close: "
                "<span style='background:%s'>up a lot</span><span style='background:%s'>up a little</span>"
                "<span style='background:%s'>down a little</span><span style='background:%s'>down a lot</span></p>" % (

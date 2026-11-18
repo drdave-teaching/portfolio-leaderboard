@@ -26,12 +26,15 @@ CONCENTRATED_START = "2026-11-19"          # 🎯 funds are sent on Studio 6 nig
 EXCLUDE_KEY = "config/crowd_exclude.txt"
 DEMO_NETIDS = {"dww05002"}
 CONCENTRATED_SUFFIX = "-c"
+FINAL_SUFFIX = "-f"                        # a final-project fund (Studio 6 "Your Final Fund"): its own fund id
 
 
 def is_demo(netid):
     netid = str(netid)
     if netid.endswith(CONCENTRATED_SUFFIX):
         netid = netid[:-len(CONCENTRATED_SUFFIX)]
+    if netid.endswith(FINAL_SUFFIX):
+        netid = netid[:-len(FINAL_SUFFIX)]
     return netid in DEMO_NETIDS or netid.startswith("zzz")
 
 
@@ -59,6 +62,8 @@ def members(entries, concentrated, excluded):
             continue
         if entry["received_utc"] > FREEZE_UTC:
             continue
+        if entry.get("decision") == "final" or netid.endswith(FINAL_SUFFIX):
+            continue          # a final-project fund is not part of the class crowd fund (that is the Studio 5 funds)
         if not concentrated and entry.get("notebook") == "studio6":
             # the crowd is the class's Studio 5 funds, held: a Studio 6 decision (hold / refresh / change) is that
             # manager's own move, and must not move the benchmark everyone is compared with

@@ -45,6 +45,25 @@ ul.how { line-height:1.6; }
 """
 
 
+TABS_CSS = """
+.tabs { display:flex; gap:6px; flex-wrap:wrap; margin:14px 0 6px; border-bottom:2px solid #d9dee6; }
+.tabs a { padding:8px 16px; border-radius:8px 8px 0 0; text-decoration:none; color:#33435c; font-weight:600;
+          background:#eef1f5; border:1px solid #d9dee6; border-bottom:none; }
+.tabs a.on { background:#13233a; color:white; border-color:#13233a; }
+"""
+
+
+def tabs(active, up=""):
+    """The tab bar on every page. active: 'final', 'studio5' or 'holdings'. up: '../' from inside a folder."""
+    names = [("final", "index.html", "Final project"), ("studio5", "studio5.html", "Studio 5 funds (practice)"),
+             ("holdings", "holdings.html", "Who holds what (Studio 5)")]
+    out = ["<style>%s</style><div class='tabs'>" % TABS_CSS]
+    for key, href, label in names:
+        out.append("<a href='%s%s'%s>%s</a>" % (up, href, " class='on'" if key == active else "", label))
+    out.append("</div>")
+    return "".join(out)
+
+
 def pct(value, signed=True):
     if value is None or (isinstance(value, float) and np.isnan(value)):
         return "-"
@@ -297,11 +316,12 @@ def render(result, updated_et, chart_name="chart.png", featured=None, links=None
     out.append("<meta name='viewport' content='width=device-width, initial-scale=1'>")
     out.append("<title>OPIM 5641 Portfolio Leaderboard</title><style>%s%s</style>" % (CSS, interactive.CSS))
     out.append("<script>%s</script></head><body>" % interactive.JS)
-    out.append("<header><div class='wrap'><h1>OPIM 5641 · Portfolio Leaderboard</h1>")
+    out.append("<header><div class='wrap'><h1>OPIM 5641 · Studio 5 Funds (practice)</h1>")
     sub = "Fall 2026 · every fund starts with $10,000 · updated %s" % html.escape(updated_et)
     if result["last_close"]:
         sub += " · prices through the close of %s" % html.escape(result["last_close"])
     out.append("<div class='sub'>%s</div></div></header><div class='wrap'>" % sub)
+    out.append(tabs("studio5"))
 
     # the cards
     n_live = len(board)

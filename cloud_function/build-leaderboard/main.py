@@ -28,6 +28,7 @@ from google.cloud import storage
 
 import board as scoring
 import crowd
+import final_page
 import fund_pages
 import holdings_page
 import interactive
@@ -83,6 +84,35 @@ def tag_concentrated(entries):
         if entry.get("fund_kind") == "concentrated" and not str(entry.get("netid", "")).endswith(crowd.CONCENTRATED_SUFFIX):
             entry["owner_netid"] = entry["netid"]
             entry["netid"] = entry["netid"] + crowd.CONCENTRATED_SUFFIX
+
+
+def tag_final(entries):
+    """A final-project fund (sent from the Studio 6 notebook, decision = 'final') is its own fund on the board:
+    fund id = the sender's NetID + '-f'. It starts with $10,000 at its first close, apart from the Studio 5 fund."""
+    for entry in entries:
+        if entry.get("decision") == "final" and not str(entry.get("netid", "")).endswith(crowd.FINAL_SUFFIX):
+            entry["owner_netid"] = entry["netid"]
+            entry["netid"] = entry["netid"] + crowd.FINAL_SUFFIX
+
+
+def one_arena(result, prices, final):
+    """The part of a board result that belongs to one arena (final funds, or everything else), ranked on its own."""
+    def mine(frame):
+        if len(frame) == 0:
+            return frame
+        is_final = frame["netid"].astype(str).str.endswith(crowd.FINAL_SUFFIX)
+        return frame[is_final == final].reset_index(drop=True)
+
+    board = mine(result["board"])
+    if len(board) > 0:
+        board = board.sort_values("with_rules_growth_pct", ascending=False).reset_index(drop=True)
+        board["rank"] = range(1, len(board) + 1)
+    benchmark_path = pd.Series(dtype=float)
+    if len(board) > 0 and len(prices) > 0:
+        first_day = pd.Timestamp(board["started"].min())
+        benchmark_path, _ = scoring.value_path([(first_day, {scoring.BENCHMARK: 1.0})], prices.sort_index().ffill())
+    return {"board": board, "pending": mine(result["pending"]), "values": mine(result["values"]), "log": result["log"],
+            "benchmark_path": benchmark_path, "last_close": result["last_close"]}
 
 
 def mark_concentrated(entries):
@@ -192,6 +222,7 @@ def build_http(request):
 
         entries = read_entries(entries_bucket)
         tag_concentrated(entries)
+        tag_final(entries)
         apply_nicknames(entries_bucket, entries)
         mark_concentrated(entries)
         allowed = None
@@ -214,6 +245,11 @@ def build_http(request):
             prices = pd.DataFrame(columns=[scoring.BENCHMARK], dtype=float)
 
         result = scoring.build_board(entries, prices, allowed_netids=allowed)
+        # two arenas, each ranked on its own: the Studio 5 funds (practice) and the final-project funds
+        practice = one_arena(result, prices, final=False)
+        final = one_arena(result, prices, final=True)
+        paged = dict(result)                      # for the fund pages: every fund, with its rank in its own arena
+        paged["board"] = pd.concat([practice["board"], final["board"]]).reset_index(drop=True)
 
         # private tables
         if len(result["board"]) > 0:
@@ -247,20 +283,20 @@ def build_http(request):
         # one page per fund (click a nickname); never let it break the leaderboard
         links = {}
         try:
-            links = fund_pages.build(result, entries, prices, entries_bucket, public_bucket, read_text, write_text,
+            links = fund_pages.build(paged, entries, prices, entries_bucket, public_bucket, read_text, write_text,
                                      updated, EASTERN)
         except Exception:
             logging.warning("fund pages skipped: %s", traceback.format_exc())
         # "Who holds what": every fund's stocks on one page (fund names only)
         try:
-            write_text(public_bucket, "holdings.html", holdings_page.render(result, entries, prices, links, updated), "text/html")
+            write_text(public_bucket, "holdings.html", holdings_page.render(practice, entries, prices, links, updated), "text/html")
         except Exception:
             logging.warning("holdings page skipped: %s", traceback.format_exc())
         backtests = []
         backtests_png = None
         backtests_data = None
         try:
-            backtests, backtests_png, backtests_data = fund_pages.backtest_board(result, entries)
+            backtests, backtests_png, backtests_data = fund_pages.backtest_board(practice, entries)
             if backtests_png is not None:
                 blob = public_bucket.blob("backtests.png")
                 blob.cache_control = "no-cache, max-age=0"
@@ -270,7 +306,7 @@ def build_http(request):
         # "2026 so far": every fund's current mix held from Dec 31, 2025, with a line where the funds went live
         year_data = None
         try:
-            year_data = fund_pages.year_so_far(result, entries, prices)
+            year_data = fund_pages.year_so_far(practice, entries, prices)
         except Exception:
             logging.warning("2026-so-far chart skipped: %s", traceback.format_exc())
         crowds = {"crowd": None, "concentrated": None}
@@ -286,14 +322,19 @@ def build_http(request):
                 extras.append((one["name"], one["path"], "#6a1b9a" if key == "crowd" else "#c2185b"))
         race_chart = None
         race_data = None
-        if len(result["board"]) > 0:
-            race_chart = page.make_chart(result["values"], result["board"], result["benchmark_path"], extras)
-            race_data = interactive.race_data(result["values"], result["board"], result["benchmark_path"], extras)
+        if len(practice["board"]) > 0:
+            race_chart = page.make_chart(practice["values"], practice["board"], practice["benchmark_path"], extras)
+            race_data = interactive.race_data(practice["values"], practice["board"], practice["benchmark_path"], extras)
         if race_chart is not None:
             blob = public_bucket.blob("chart.png")
             blob.cache_control = "no-cache, max-age=0"
             blob.upload_from_string(race_chart, content_type="image/png")
-        write_text(public_bucket, "index.html", page.render(result, updated, featured=featured, links=links, backtests=backtests,
+        # the front page is the final-project leaderboard; the Studio 5 funds have their own tab
+        try:
+            write_text(public_bucket, "index.html", final_page.render(final, entries, prices, links, updated), "text/html")
+        except Exception:
+            logging.warning("final page skipped: %s", traceback.format_exc())
+        write_text(public_bucket, "studio5.html", page.render(practice, updated, featured=featured, links=links, backtests=backtests,
                                                                 backtests_chart=backtests_png is not None,
                                                                 race_chart=race_chart is not None, race_data=race_data,
                                                                 backtests_data=backtests_data, crowds=crowds,

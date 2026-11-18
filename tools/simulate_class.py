@@ -1,7 +1,9 @@
 # Dress rehearsal: run the gatekeeper's checks and the whole leaderboard build locally, with pretend students and
 # REAL prices, against an in-memory stand-in for Cloud Storage. Writes the page to tools/out/ so you can open it.
 #   python tools/simulate_class.py
+import io
 import json
+import pandas as pd
 import os
 import sys
 import types
@@ -191,6 +193,18 @@ for netid, name, picks in [("abc12345", "Costco Believers", {"COST": 0.4, "AAPL"
              "theses": theses, "partner_netid": "", "portfolios": {"no_rules": picks, "with_rules": picks}}
     BUCKETS["entries"].blob("submissions/%s-c/2026-10-27T23-30-00Z.json" % netid).upload_from_string(json.dumps(entry))
 save("zzz00009", "Dr. Dave demo", "demo", "2026-10-07T23:30:00Z", {"TSLA": 1.0}, {"TSLA": 1.0})
+# FINAL-PROJECT funds (Studio 6 "Your Final Fund"): saved under the student's own NetID, as the gatekeeper does.
+# abc12345 already has a Studio 5 fund; its final fund must be a separate fund that starts with $10,000.
+twelve = {}
+for t in ["NVDA", "LLY", "XOM", "CVX", "WMT", "KO", "GE", "JNJ", "AVGO", "AMD", "COST", "JPM"]:
+    twelve[t] = round(1 / 12, 6)
+for netid, name, strategy, received in [("abc12345", "FINAL: Chips and Steady", "momentum plus steady names", "2026-10-28T23:10:00Z"),
+                                        ("bcd23456", "FINAL: Bargain Bin", "bargains", "2026-10-29T15:00:00Z"),
+                                        ("cde34567", "FINAL: Sent Tonight", "my own view", now)]:
+    entry = {"netid": netid, "nickname": name, "theme": strategy, "reason": "Studio 6 final fund. Test.",
+             "received_utc": received, "google_email": netid + "@example.com", "decision": "final", "notebook": "studio6",
+             "stock_theme": "final fund", "portfolios": {"no_rules": {"NVDA": 0.6, "LLY": 0.4}, "with_rules": twelve}}
+    BUCKETS["entries"].blob("submissions/%s/final_%s.json" % (netid, received.replace(":", "-"))).upload_from_string(json.dumps(entry))
 if crowd > 0:
     # a Studio 6 decision (Nov 17 rework): sim00001 changes the fund from the Studio 6 notebook. No backtest is sent.
     # The crowd must keep the Studio 5 mix, and the fund's Studio 5 backtest must stay on its page and the board.
@@ -225,7 +239,7 @@ if crowd > 0:
     assert studio5_mix in public_crowd["funds"], "the crowd lost sim00001's Studio 5 mix"
     assert {"SBUX": 0.5, "MCD": 0.5} not in public_crowd["funds"], "a Studio 6 decision moved the crowd"
     assert {"HD": 0.5, "UNH": 0.5} in public_crowd["funds"], "a first fund sent from Studio 6 should join the crowd"
-    board_text = BUCKETS["page"].store["index.html"].decode()
+    board_text = BUCKETS["page"].store["studio5.html"].decode()
     kept = 0
     for name in BUCKETS["page"].store:
         if name.startswith("funds/") and name.endswith(".html"):
@@ -258,18 +272,36 @@ assert holding_pages >= 4, holding_pages
 print("fund pages OK:", holding_pages, "pages list their holdings")
 who = BUCKETS["page"].store["holdings.html"].decode()
 assert "Tech Titans" in who and "Who holds what" in who and "abc12345" not in who and "@example.com" not in who
-assert "holdings.html" in BUCKETS["page"].store["index.html"].decode()
+assert "holdings.html" in BUCKETS["page"].store["studio5.html"].decode()
 open(os.path.join(OUT, "holdings.html"), "wb").write(BUCKETS["page"].store["holdings.html"])
 assert "spy_growth_pct" in public_crowd["crowd"]["stats"] and "vs_spy_pct" in public_crowd["crowd"]["stats"]
-assert "the same dollars in each of" in BUCKETS["page"].store["index.html"].decode()
+assert "the same dollars in each of" in BUCKETS["page"].store["studio5.html"].decode()
 print("holdings page OK; crowd vs S&P:", public_crowd["crowd"]["stats"]["vs_spy_pct"])
-index_text = BUCKETS["page"].store["index.html"].decode()
+index_text = BUCKETS["page"].store["studio5.html"].decode()
 assert "2026 so far: before and after the funds went live" in index_text and "lbChart('year'" in index_text
 assert '"marker":{"date":"2026-11-05"' in index_text
 print("2026-so-far chart OK")
+front = BUCKETS["page"].store["index.html"].decode()
+practice_page = BUCKETS["page"].store["studio5.html"].decode()
+assert "Final Project Leaderboard" in front and "FINAL: Chips and Steady" in front and "FINAL: Bargain Bin" in front
+assert "FINAL: Sent Tonight" in front and "Starting at the next market close" in front
+assert "Tech Titans" not in front, "a Studio 5 fund is on the final board"
+assert "FINAL:" not in practice_page, "a final fund is on the Studio 5 board"
+assert "Tech Titans" in practice_page and "Studio 5 Funds (practice)" in practice_page
+assert "abc12345" not in front and "@example.com" not in front
+private = pd.read_csv(io.StringIO(store["class/leaderboard_private.csv"].decode()))
+finals = private[private["netid"].astype(str).str.endswith("-f")]
+assert len(finals) == 2, len(finals)
+values = pd.read_csv(io.StringIO(store["class/daily_values.csv"].decode()))
+first = values[(values["netid"] == "abc12345-f") & (values["portfolio"] == "with_rules")].sort_values("date").iloc[0]
+assert abs(first["value"] - 10000) < 1, first["value"]      # the test mix adds up to 0.999996
+assert {"NVDA": 0.6, "LLY": 0.4} not in public_crowd["funds"] and twelve not in public_crowd["funds"], "a final fund is in the crowd"
+open(os.path.join(OUT, "final.html"), "wb").write(BUCKETS["page"].store["index.html"])
+open(os.path.join(OUT, "studio5.html"), "wb").write(BUCKETS["page"].store["studio5.html"])
+print("final arena OK:", len(finals), "final funds ranked, 1 waiting; Studio 5 board untouched")
 print("crowd OK:", public_crowd["crowd"]["members"], "funds,", public_crowd["crowd"]["stats"])
 open(os.path.join(OUT, "crowd.json"), "wb").write(BUCKETS["page"].store["crowd.json"])
-page_text = BUCKETS["page"].store["index.html"].decode()
+page_text = BUCKETS["page"].store["studio5.html"].decode()
 assert "🎯 Costco Believers" in page_text and "Class crowd fund" in page_text
 focus_pages = []
 for name in BUCKETS["page"].store:
@@ -277,7 +309,7 @@ for name in BUCKETS["page"].store:
         focus_pages.append(name)
 assert len(focus_pages) == 2, focus_pages
 open(os.path.join(OUT, "focus_page.html"), "wb").write(BUCKETS["page"].store[focus_pages[0]])
-open(os.path.join(OUT, "index.html"), "wb").write(BUCKETS["page"].store["index.html"])
+open(os.path.join(OUT, "index.html"), "wb").write(BUCKETS["page"].store["studio5.html"])
 open(os.path.join(OUT, "chart.png"), "wb").write(BUCKETS["page"].store["chart.png"])
 open(os.path.join(OUT, "leaderboard_private.csv"), "wb").write(store["class/leaderboard_private.csv"])
 open(os.path.join(OUT, "entries_log.csv"), "wb").write(store["class/entries_log.csv"])
