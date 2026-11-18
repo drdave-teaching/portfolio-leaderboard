@@ -353,7 +353,16 @@ def build_http(request):
             logging.warning("fund_records.json skipped: %s", traceback.format_exc())
         # the front page is the final-project leaderboard; the Studio 5 funds have their own tab
         try:
-            write_text(public_bucket, "index.html", final_page.render(final, entries, prices, links, updated), "text/html")
+            # the class fund in the final race: the class's average Studio 5 mix, with $10,000 placed at the close the
+            # first final fund started, so it covers the same days as the final funds and the S&P 500 row
+            class_fund = None
+            one = crowds.get("crowd")
+            if one is not None and len(final["board"]) > 0 and len(prices) > 0:
+                first_day = pd.Timestamp(final["board"]["started"].min())
+                class_path, _ = scoring.value_path([(first_day, one["weights"])], prices.sort_index().ffill())
+                class_fund = {"name": one["name"], "members": one["members"], "path": class_path}
+            write_text(public_bucket, "index.html",
+                       final_page.render(final, entries, prices, links, updated, class_fund), "text/html")
         except Exception:
             logging.warning("final page skipped: %s", traceback.format_exc())
         # "The market": the 100-company quilt, with how many final funds hold each stock

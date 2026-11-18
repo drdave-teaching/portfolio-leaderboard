@@ -28,8 +28,13 @@ def chips(mix, since):
     return "".join(out)
 
 
-def render(final, entries, prices, links, updated):
-    """final: the board result for the final funds only (ranked among themselves)."""
+def render(final, entries, prices, links, updated, class_fund=None):
+    """final: the board result for the final funds only (ranked among themselves).
+    class_fund: {"name", "members", "path"} = the class's average Studio 5 mix held from the close the first final fund
+    started (None if there is no class fund yet). It gets a card, an unranked row and a line on the chart."""
+    class_path = pd.Series(dtype=float)
+    if class_fund is not None:
+        class_path = class_fund["path"]
     board = final["board"]
     pending = final["pending"]
 
@@ -77,6 +82,9 @@ def render(final, entries, prices, links, updated):
         out.append("<div class='card'><div class='big'>%s</div><div class='lab'>S&amp;P 500 since the first final fund started</div></div>" % page.pct(spy_growth))
         ahead = int((board["rules_minus_spy_pct"] > 0).sum())
         out.append("<div class='card'><div class='big'>%d of %d</div><div class='lab'>final funds ahead of the S&amp;P 500</div></div>" % (ahead, len(board)))
+    if len(board) > 0 and len(class_path) > 1:
+        class_growth = 100 * (class_path.iloc[-1] / class_path.iloc[0] - 1)
+        out.append("<div class='card'><div class='big'>%s</div><div class='lab'>the class fund since the first final fund started</div></div>" % page.pct(class_growth))
     out.append("<div class='card'><div class='big'>Dec 3</div><div class='lab'>the race ends at this market close</div></div>")
     out.append("</div>")
 
@@ -104,12 +112,35 @@ def render(final, entries, prices, links, updated):
                        "<td>%s</td><td>–</td><td>%s</td><td class='l'>–</td></tr>" % (
                            "{:,.0f}".format(spy_value), page.pct(spy_growth), page.plain_pct(spy_drop),
                            html.escape(spy.index[0].strftime("%Y-%m-%d"))))
-        placed = False
+        # the class fund: the average of the class's Studio 5 funds, over the same days as the S&P 500 row
+        class_row = None
+        if len(class_path) > 0:
+            class_value = float(class_path.iloc[-1])
+            class_growth = 100 * (class_path.iloc[-1] / class_path.iloc[0] - 1)
+            class_drop = 100 * float((1 - class_path / class_path.cummax()).max())
+            minus = "–"
+            if len(spy) > 0:
+                minus = page.points(class_growth - 100 * (spy.iloc[-1] / spy.iloc[0] - 1))
+            class_row = (class_value, "<tr style='background:#f3e9f7'><td>–</td><td class='l fund'>%s</td>"
+                         "<td class='l theme'>the average of the class's %d Studio 5 funds, since the first final fund started</td>"
+                         "<td>$%s</td><td>%s</td><td>%s</td><td>%s</td><td>–</td><td>%s</td>"
+                         "<td class='l'><a href='holdings.html'>who holds what</a></td></tr>" % (
+                             html.escape(str(class_fund["name"])), int(class_fund["members"]),
+                             "{:,.0f}".format(class_value), page.pct(class_growth), minus, page.plain_pct(class_drop),
+                             html.escape(class_path.index[0].strftime("%Y-%m-%d"))))
+
+        # the two rows that are not ranked sit where their value puts them, best first
+        unranked = []
+        if spy_row is not None:
+            unranked.append(spy_row)
+        if class_row is not None:
+            unranked.append(class_row)
+        unranked = sorted(unranked, key=lambda pair: -pair[0])
         for i in range(len(board)):
             r = board.loc[i]
-            if spy_row is not None and not placed and spy_row[0] > r["with_rules_value"]:
-                out.append(spy_row[1])
-                placed = True
+            while len(unranked) > 0 and unranked[0][0] > r["with_rules_value"]:
+                out.append(unranked[0][1])
+                unranked = unranked[1:]
             mix = latest[r["netid"]]["portfolios"]["with_rules"] if r["netid"] in latest else {}
             out.append("<tr><td>%d</td><td class='l fund'>%s</td><td class='l theme'>%s</td><td>$%s</td><td>%s</td><td>%s</td>"
                        "<td>%s</td><td>%d</td><td>%s</td><td class='holds'>%s</td></tr>" % (
@@ -117,19 +148,25 @@ def render(final, entries, prices, links, updated):
                            "{:,.0f}".format(r["with_rules_value"]), page.pct(r["with_rules_growth_pct"]),
                            page.points(r["rules_minus_spy_pct"]), page.plain_pct(r["with_rules_worst_drop_pct"]),
                            int(r["changes"]), html.escape(str(r["started"])), chips(mix, since)))
-        if spy_row is not None and not placed:
-            out.append(spy_row[1])
+        for pair in unranked:
+            out.append(pair[1])
         out.append("</table></div>")
         out.append("<p class='note'><b>Return since it started</b>: what the fund's $10,000 has done since its first close. "
                    "<b>Fund minus S&amp;P 500</b>: that return minus the S&amp;P 500's over the same days, in percentage points. "
                    "<b>Worst drop</b>: the biggest fall from a high point so far. Each stock shows its share of the fund%s. "
-                   "The gray S&amp;P 500 row is not ranked.</p>" % (
-                       " and its return since the race began, blue up and red down" if len(since) > 0 else ""))
+                   "The gray S&amp;P 500 row is not ranked.%s</p>" % (
+                       " and its return since the race began, blue up and red down" if len(since) > 0 else "",
+                       " The purple row is the <b>class fund</b>: the average of the class's Studio 5 funds, with $10,000 "
+                       "placed at the same close as the first final fund. It is not ranked either. Did your final fund "
+                       "beat the class?" if class_row is not None else ""))
 
-        race = interactive.race_data(final["values"], board, final["benchmark_path"], [])
+        extras = []
+        if len(class_path) > 0:
+            extras.append((str(class_fund["name"]), class_path, "#6a1b9a"))
+        race = interactive.race_data(final["values"], board, final["benchmark_path"], extras)
         if race is not None:
             out.append("<h2>The race, day by day</h2><p class='note'>Click a fund to turn its line on or off. The black line is "
-                       "the S&amp;P 500.</p>")
+                       "the S&amp;P 500%s.</p>" % (" and the purple line is the class fund" if len(class_path) > 0 else ""))
             out.append(interactive.block("finalrace", race, None, "Value of every final fund over time"))
 
     if len(pending) > 0:

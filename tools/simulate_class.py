@@ -286,6 +286,8 @@ practice_page = BUCKETS["page"].store["studio5.html"].decode()
 assert "Final Project Leaderboard" in front and "FINAL: Chips and Steady" in front and "FINAL: Bargain Bin" in front
 assert "FINAL: Sent Tonight" in front and "Starting at the next market close" in front
 assert "Tech Titans" not in front, "a Studio 5 fund is on the final board"
+assert "Class crowd fund" in front and "the class fund since the first final fund started" in front, "no class fund on the final board"
+assert front.count("background:#f3e9f7") == 1, "the class fund row should be there once"
 assert "FINAL:" not in practice_page, "a final fund is on the Studio 5 board"
 assert "Tech Titans" in practice_page and "Studio 5 Funds (practice)" in practice_page
 assert "abc12345" not in front and "@example.com" not in front
