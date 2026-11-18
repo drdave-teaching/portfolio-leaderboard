@@ -329,6 +329,23 @@ def build_http(request):
             blob = public_bucket.blob("chart.png")
             blob.cache_control = "no-cache, max-age=0"
             blob.upload_from_string(race_chart, content_type="image/png")
+        # fund_records.json: every Studio 5 fund's name and the link to its record, so the Studio 6 notebook can load
+        # a fund by its name (Dr. Dave, Nov 18: students should not have to hunt for a link). Fund names only.
+        try:
+            salt = fund_pages.get_salt(entries_bucket, read_text, write_text)
+            listed = []
+            for frame in [practice["board"], practice["pending"]]:
+                for i in range(len(frame)):
+                    netid = str(frame.loc[i, "netid"])
+                    if netid.endswith(crowd.CONCENTRATED_SUFFIX):
+                        continue
+                    listed.append({"name": str(frame.loc[i, "nickname"]),
+                                   "record": "https://storage.googleapis.com/%s/records/%s.json" % (
+                                       PUBLIC_BUCKET, fund_pages.record_slug_for(netid, salt))})
+            listed = sorted(listed, key=lambda one: one["name"].lower())
+            write_text(public_bucket, "fund_records.json", json.dumps({"updated": updated, "funds": listed}), "application/json")
+        except Exception:
+            logging.warning("fund_records.json skipped: %s", traceback.format_exc())
         # the front page is the final-project leaderboard; the Studio 5 funds have their own tab
         try:
             write_text(public_bucket, "index.html", final_page.render(final, entries, prices, links, updated), "text/html")

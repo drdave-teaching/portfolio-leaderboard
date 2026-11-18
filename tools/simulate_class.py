@@ -299,6 +299,14 @@ assert {"NVDA": 0.6, "LLY": 0.4} not in public_crowd["funds"] and twelve not in 
 open(os.path.join(OUT, "final.html"), "wb").write(BUCKETS["page"].store["index.html"])
 open(os.path.join(OUT, "studio5.html"), "wb").write(BUCKETS["page"].store["studio5.html"])
 print("final arena OK:", len(finals), "final funds ranked, 1 waiting; Studio 5 board untouched")
+index = json.loads(BUCKETS["page"].store["fund_records.json"].decode())
+index_names = [one["name"] for one in index["funds"]]
+assert "Tech Titans" in index_names and not any(name.startswith("FINAL:") for name in index_names), index_names
+titans = [one for one in index["funds"] if one["name"] == "Tech Titans"][0]
+record_key = titans["record"].split("/page/")[-1] if "/page/" in titans["record"] else "records/" + titans["record"].split("/records/")[-1]
+assert record_key in BUCKETS["page"].store, record_key
+assert "abc12345" not in json.dumps(index)
+print("fund_records.json OK:", len(index_names), "funds listed by name")
 print("crowd OK:", public_crowd["crowd"]["members"], "funds,", public_crowd["crowd"]["stats"])
 open(os.path.join(OUT, "crowd.json"), "wb").write(BUCKETS["page"].store["crowd.json"])
 page_text = BUCKETS["page"].store["studio5.html"].decode()
