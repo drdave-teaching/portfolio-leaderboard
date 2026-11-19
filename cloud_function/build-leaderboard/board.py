@@ -8,6 +8,12 @@
 #     new mix with what the old mix was worth that day, so the value line continues; nothing resets.
 #   - Changes are unlimited. Every one is kept, with its time and reason.
 #   - A ticker with no price is held as cash (flat), and flagged.
+#   - THE FINAL-PROJECT RACE (Dr. Dave, Nov 18): it starts at the opening bell on RACE_DAY (Mon Nov 23, 9:30 AM
+#     Eastern). Every final fund sent before the bell starts together, with $10,000 at that morning's OPENING prices
+#     (the last one a student sent before the bell is the one that starts). A final fund sent or changed after the
+#     bell follows the usual rule: it counts from the next market close.
+#     The price table is daily closes, so the opening prices of RACE_DAY are kept as one extra row, dated the day
+#     before (RACE_OPEN_ROW, a Sunday). Funds that start at the bell count from that row.
 
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
@@ -19,6 +25,63 @@ EASTERN = ZoneInfo("America/New_York")
 START_VALUE = 10000.0
 PORTFOLIO_KEYS = ["with_rules", "no_rules"]
 BENCHMARK = "SPY"
+
+RACE_DAY = None            # the trading day the final-project race starts (set by set_race)
+RACE_START_UTC = None      # its opening bell, 9:30 AM Eastern, in UTC
+RACE_OPEN_ROW = None       # the row of the price table that holds RACE_DAY's opening prices (the day before)
+
+
+def set_race(day):
+    """Set the day the final-project race starts. It must be a Monday, so the row before it is not a trading day."""
+    global RACE_DAY, RACE_START_UTC, RACE_OPEN_ROW
+    RACE_DAY = pd.Timestamp(day).normalize()
+    if RACE_DAY.weekday() != 0:
+        raise ValueError("the race must start on a Monday")
+    bell = datetime.combine(RACE_DAY.date(), time(9, 30), tzinfo=EASTERN)
+    RACE_START_UTC = pd.Timestamp(bell).tz_convert("UTC")
+    RACE_OPEN_ROW = RACE_DAY - pd.Timedelta(days=1)
+
+
+set_race("2026-11-23")
+
+
+def race_bell_label():
+    return "%s %d, 9:30 AM" % (RACE_DAY.strftime("%a %b"), RACE_DAY.day)
+
+
+def starts_at_the_bell(entry):
+    """True for a final fund that was sent before the opening bell of the race."""
+    if entry.get("decision") != "final":
+        return False
+    received = pd.Timestamp(entry["received_utc"])
+    if received.tzinfo is None:
+        received = received.tz_localize("UTC")
+    return received < RACE_START_UTC
+
+
+def counts_from(entry, trading_days):
+    """The row of the price table an entry counts from, or None if that price has not happened yet."""
+    if starts_at_the_bell(entry):
+        for day in trading_days:
+            if pd.Timestamp(day) == RACE_OPEN_ROW:
+                return RACE_OPEN_ROW
+        return None
+    return first_close_after(entry["received_utc"], trading_days)
+
+
+def starts_text(entry):
+    """For an entry still waiting: when it starts, in words."""
+    if starts_at_the_bell(entry):
+        return "the opening bell on %s Eastern" % race_bell_label()
+    return "the close on %s" % expected_start_label(entry["received_utc"])
+
+
+def day_label(day, fmt="%Y-%m-%d"):
+    """A start day for people to read: the opening-prices row is shown as the opening bell of the race."""
+    day = pd.Timestamp(day)
+    if day == RACE_OPEN_ROW:
+        return "%s %d open" % (RACE_DAY.strftime("%a %b"), RACE_DAY.day)
+    return day.strftime(fmt)
 
 
 def close_time_utc(day):
@@ -33,6 +96,8 @@ def first_close_after(received_utc, trading_days):
     if received.tzinfo is None:
         received = received.tz_localize("UTC")
     for day in trading_days:
+        if pd.Timestamp(day) == RACE_OPEN_ROW:
+            continue                      # the opening-prices row of the race is not a close
         if close_time_utc(day) > received:
             return pd.Timestamp(day)
     return None
@@ -126,7 +191,7 @@ def build_board(submissions, prices, allowed_netids=None):
         # one segment per entry, by the close it counts from; two entries before the same close: the later one wins
         segments = {}
         for entry in entries:
-            day = first_close_after(entry["received_utc"], trading_days)
+            day = counts_from(entry, trading_days)
             log_rows.append({
                 "netid": netid,
                 "nickname": entry.get("nickname"),
@@ -157,6 +222,9 @@ def build_board(submissions, prices, allowed_netids=None):
         }
         if len(segments) == 0:
             base["starts"] = expected_start_label(entries[0]["received_utc"])
+            base["starts_text"] = starts_text(entries[0])
+            if starts_at_the_bell(entries[0]):
+                base["starts"] = race_bell_label()
             pending.append(base)
             continue
 

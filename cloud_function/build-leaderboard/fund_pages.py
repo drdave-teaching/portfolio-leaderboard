@@ -49,7 +49,7 @@ def record_json(netid, mine, result, prices, trading_days, updated):
     """Everything a student's dashboard needs: their entries (with holdings) and the daily values."""
     entries_out = []
     for entry in mine:
-        day = scoring.first_close_after(entry["received_utc"], trading_days)
+        day = scoring.counts_from(entry, trading_days)
         entries_out.append({
             "received_utc": entry["received_utc"],
             "counts_from": day.strftime("%Y-%m-%d") if day is not None else None,
@@ -188,7 +188,7 @@ def page_html(nickname, theme, row, waiting_label, history, has_value_png, backt
         out.append("<div class='card'><div class='big'>$%s</div><div class='lab'>its $10,000 at the last close</div></div>" %
                    "{:,.0f}".format(row["with_rules_value"]))
         out.append("<div class='card'><div class='big'>%s</div><div class='lab'>since it started (%s)</div></div>" %
-                   (page.pct(row["with_rules_growth_pct"]), html.escape(str(row["started"]))))
+                   (page.pct(row["with_rules_growth_pct"]), html.escape(scoring.day_label(row["started"]))))
         out.append("<div class='card'><div class='big'>%s</div><div class='lab'>its no-rules twin</div></div>" % page.pct(row["no_rules_growth_pct"]))
         out.append("<div class='card'><div class='big'>%s</div><div class='lab'>S&amp;P 500, same days</div></div>" % page.pct(row["spy_growth_pct"]))
         out.append("<div class='card'><div class='big'>#%d</div><div class='lab'>on the leaderboard</div></div>" % row["rank"])
@@ -196,7 +196,7 @@ def page_html(nickname, theme, row, waiting_label, history, has_value_png, backt
         if has_value_png:
             out.append("<img class='chart' src='%s' alt='Value since it started'>" % html.escape(has_value_png))
     else:
-        out.append("<p class='note'>This fund starts at the close on %s. Its line shows up here after that close.</p>" %
+        out.append("<p class='note'>This fund starts at %s. Its line shows up here after its first close.</p>" %
                    html.escape(waiting_label))
     out.append(theses_block(theses))
     out.append(holdings_block(holdings, holdings_start))
@@ -224,7 +224,7 @@ def build(result, entries, prices, entries_bucket, public_bucket, read_text, wri
         rows[board.loc[i, "netid"]] = board.loc[i]
     waiting = {}
     for i in range(len(pending)):
-        waiting[pending.loc[i, "netid"]] = pending.loc[i, "starts"]
+        waiting[pending.loc[i, "netid"]] = pending.loc[i, "starts_text"]
 
     by_student = {}
     for entry in entries:
@@ -264,10 +264,10 @@ def build(result, entries, prices, entries_bucket, public_bucket, read_text, wri
 
         history = []
         for entry in mine:
-            day = scoring.first_close_after(entry["received_utc"], trading_days)
+            day = scoring.counts_from(entry, trading_days)
             received = pd.Timestamp(entry["received_utc"]).tz_convert(eastern).strftime("%a %b %d, %I:%M %p ET")
             history.append({"received": received,
-                            "counts_from": day.strftime("%a %b %d") if day is not None else "the next close",
+                            "counts_from": scoring.day_label(day, "%a %b %d") if day is not None else scoring.starts_text(entry),
                             "reason": str(entry.get("reason", ""))})
 
         holds = holdings_rows(latest["portfolios"]["with_rules"], prices, HOLDINGS_SINCE)

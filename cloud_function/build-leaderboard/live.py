@@ -174,7 +174,7 @@ def featured(netid, entries, prices, result, bucket, now_utc, eastern, read_text
     # which holdings were in place during this session: the latest entry that counted from a close before it
     segments = []
     for entry in mine:
-        day = scoring.first_close_after(entry["received_utc"], trading_days)
+        day = scoring.counts_from(entry, trading_days)
         if day is not None and day < session_day:
             segments.append((day, entry))
     live_today = len(segments) > 0
@@ -217,11 +217,11 @@ def featured(netid, entries, prices, result, bucket, now_utc, eastern, read_text
     nickname = mine[-1].get("nickname", "Featured fund")
     status = "live"
     if not live_today:
-        first = scoring.first_close_after(mine[0]["received_utc"], trading_days)
+        first = scoring.counts_from(mine[0], trading_days)
         if first is None:
-            status = "Its $10,000 starts at the next close. Until then, this shows how its stocks are moving."
+            status = "Its $10,000 starts at %s. Until then, this shows how its stocks are moving." % scoring.starts_text(mine[0])
         else:
-            status = "It started at the close on %s, so today shows how its stocks moved that day." % first.strftime("%a %b %d")
+            status = "It started on %s, so today shows how its stocks moved that day." % scoring.day_label(first, "%a %b %d")
 
     # what it holds, and what each stock did to it today (contribution = share x move, in percentage points)
     sectors = mine[-1].get("sectors", {})

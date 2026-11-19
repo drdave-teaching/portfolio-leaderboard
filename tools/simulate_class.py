@@ -132,6 +132,9 @@ for case in focus_bad:
 print("concentrated checks OK")
 builder.crowd.CROWD_START = "2026-10-21"          # the real start (Nov 5) has no closes yet in a test run
 builder.crowd.CONCENTRATED_START = "2026-10-28"
+# the real race starts at the opening bell on Mon Nov 23. For the test it starts on Mon Nov 2, so the two final funds
+# sent on Oct 28 and Oct 29 start together at that morning's opening prices.
+builder.scoring.set_race("2026-11-02")
 
 
 # ---- 2. pretend students (entries saved straight into the fake bucket, as the gatekeeper would)
@@ -284,7 +287,8 @@ print("2026-so-far chart OK")
 front = BUCKETS["page"].store["index.html"].decode()
 practice_page = BUCKETS["page"].store["studio5.html"].decode()
 assert "Final Project Leaderboard" in front and "FINAL: Chips and Steady" in front and "FINAL: Bargain Bin" in front
-assert "FINAL: Sent Tonight" in front and "Starting at the next market close" in front
+assert "FINAL: Sent Tonight" in front and "Waiting to start" in front and "the close on " in front
+assert "the race starts at the 9:30 AM opening bell" in front and "Mon Nov 2 open" in front
 assert "Tech Titans" not in front, "a Studio 5 fund is on the final board"
 assert "Class crowd fund" in front and "the class fund since the first final fund started" in front, "no class fund on the final board"
 assert front.count("background:#f3e9f7") == 1, "the class fund row should be there once"
@@ -297,6 +301,35 @@ assert len(finals) == 2, len(finals)
 values = pd.read_csv(io.StringIO(store["class/daily_values.csv"].decode()))
 first = values[(values["netid"] == "abc12345-f") & (values["portfolio"] == "with_rules")].sort_values("date").iloc[0]
 assert abs(first["value"] - 10000) < 1, first["value"]      # the test mix adds up to 0.999996
+# the race start: both final funds count from the opening-prices row (dated the Sunday before the race day), and the
+# first close after it is worth $10,000 x the average of close / open of the twelve stocks on the race day
+assert list(finals["started"]) == ["2026-11-01", "2026-11-01"], list(finals["started"])
+assert first["date"] == "2026-11-01", first["date"]
+import yfinance as yf           # noqa: E402
+day = yf.download(sorted(twelve), start="2026-11-02", end="2026-11-03", interval="1d", auto_adjust=True, progress=False)
+expected = 0.0
+for t in twelve:
+    expected += twelve[t] * float(day["Close"][t].iloc[0]) / float(day["Open"][t].iloc[0])
+expected = 10000 * expected
+second = values[(values["netid"] == "abc12345-f") & (values["portfolio"] == "with_rules")].sort_values("date").iloc[1]
+assert second["date"] == "2026-11-02" and abs(second["value"] - expected) < 2, (second["date"], second["value"], expected)
+closes = pd.read_csv(io.StringIO(store["prices/daily_closes.csv"].decode()), index_col=0, parse_dates=True)
+assert abs(closes.loc["2026-11-01", "NVDA"] - float(day["Open"]["NVDA"].iloc[0])) < 0.01, "the opening-prices row is wrong"
+print("race start OK: $10,000 at the Nov 2 open is $%.2f at the Nov 2 close (expected $%.2f)" % (second["value"], expected))
+# the real race day: a final fund sent tonight waits for the bell; anything else skips the opening-prices row
+builder.scoring.set_race("2026-11-23")
+tonight = {"decision": "final", "received_utc": "2026-11-19T01:30:00Z"}
+days = [pd.Timestamp("2026-11-19"), pd.Timestamp("2026-11-20")]
+assert builder.scoring.counts_from(tonight, days) is None
+assert builder.scoring.starts_text(tonight) == "the opening bell on Mon Nov 23, 9:30 AM Eastern", builder.scoring.starts_text(tonight)
+days = days + [pd.Timestamp("2026-11-22"), pd.Timestamp("2026-11-23")]
+assert builder.scoring.counts_from(tonight, days) == pd.Timestamp("2026-11-22")
+assert builder.scoring.counts_from({"decision": "final", "received_utc": "2026-11-23T14:29:00Z"}, days) == pd.Timestamp("2026-11-22")
+assert builder.scoring.counts_from({"decision": "final", "received_utc": "2026-11-23T14:31:00Z"}, days) == pd.Timestamp("2026-11-23")
+assert builder.scoring.counts_from({"received_utc": "2026-11-21T15:00:00Z"}, days) == pd.Timestamp("2026-11-23")
+assert builder.scoring.day_label("2026-11-22") == "Mon Nov 23 open"
+builder.scoring.set_race("2026-11-02")
+print("race rules OK: before the bell -> the open; after the bell -> the next close")
 assert {"NVDA": 0.6, "LLY": 0.4} not in public_crowd["funds"] and twelve not in public_crowd["funds"], "a final fund is in the crowd"
 open(os.path.join(OUT, "final.html"), "wb").write(BUCKETS["page"].store["index.html"])
 open(os.path.join(OUT, "studio5.html"), "wb").write(BUCKETS["page"].store["studio5.html"])

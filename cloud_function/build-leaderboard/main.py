@@ -89,7 +89,8 @@ def tag_concentrated(entries):
 
 def tag_final(entries):
     """A final-project fund (sent from the Studio 6 notebook, decision = 'final') is its own fund on the board:
-    fund id = the sender's NetID + '-f'. It starts with $10,000 at its first close, apart from the Studio 5 fund."""
+    fund id = the sender's NetID + '-f'. It starts with $10,000, apart from the Studio 5 fund: at the opening bell of
+    the race if it was sent before the bell (board.py), at the next close if it was sent later."""
     for entry in entries:
         if entry.get("decision") == "final" and not str(entry.get("netid", "")).endswith(crowd.FINAL_SUFFIX):
             entry["owner_netid"] = entry["netid"]
@@ -160,6 +161,22 @@ def fetch_prices(tickers, start_day):
         closes = closes.to_frame(name=sorted(tickers)[0])
     closes.index = pd.to_datetime(closes.index).tz_localize(None).normalize()
     closes = closes.dropna(how="all")
+    # the final-project race starts at the opening bell of scoring.RACE_DAY: keep that morning's opening prices as one
+    # extra row, dated the day before (scoring.RACE_OPEN_ROW). Read again on every download, so the opening prices and
+    # the closes are always adjusted for splits and dividends the same way.
+    try:
+        if "Open" in data:
+            opens = data["Open"]
+            if isinstance(opens, pd.Series):
+                opens = opens.to_frame(name=sorted(tickers)[0])
+            opens.index = pd.to_datetime(opens.index).tz_localize(None).normalize()
+            if scoring.RACE_DAY in opens.index and scoring.RACE_DAY in closes.index:
+                bell = opens.loc[scoring.RACE_DAY]
+                if bell.notna().sum() > 0:
+                    closes.loc[scoring.RACE_OPEN_ROW] = bell.reindex(closes.columns)
+                    closes = closes.sort_index()
+    except Exception:
+        logging.warning("opening prices of the race day not added: %s", traceback.format_exc())
     return closes
 
 

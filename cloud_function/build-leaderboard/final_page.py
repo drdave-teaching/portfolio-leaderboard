@@ -2,8 +2,9 @@
 #
 # Only funds sent from the Studio 6 "Your Final Fund" notebook are here (their entries carry decision = "final"; the
 # builder gives them their own fund id, NetID + "-f", so a final fund never mixes with the student's Studio 5 fund).
-# Every final fund starts with $10,000 at the first market close after it was sent and is held until its manager sends
-# a new version. The Studio 5 funds live on their own tab (studio5.html). Fund nicknames only: no NetIDs, no emails.
+# The race starts at the opening bell on Mon Nov 23 (board.py, RACE_DAY): every final fund sent before the bell starts
+# together with $10,000 at that morning's opening prices. A fund sent or changed after the bell counts from the next
+# market close. Each fund is held until its manager sends a new version. The Studio 5 funds live on their own tab (studio5.html). Fund nicknames only: no NetIDs, no emails.
 
 import html
 
@@ -15,6 +16,7 @@ import interactive
 import page
 
 RACE_ENDS = "Wednesday, Dec 2"
+RACE_STARTS = "Monday, Nov 23"
 
 
 def chips(mix, since):
@@ -75,7 +77,8 @@ def render(final, entries, prices, links, updated, class_fund=None):
     out.append("<div class='cards'>")
     out.append("<div class='card'><div class='big'>%d</div><div class='lab'>final funds in the race</div></div>" % len(board))
     if len(pending) > 0:
-        out.append("<div class='card'><div class='big'>%d</div><div class='lab'>final funds starting at the next close</div></div>" % len(pending))
+        out.append("<div class='card'><div class='big'>%d</div><div class='lab'>final funds waiting to start</div></div>" % len(pending))
+    out.append("<div class='card'><div class='big'>Nov 23</div><div class='lab'>the race starts at the 9:30 AM opening bell</div></div>")
     spy = final["benchmark_path"]
     if len(board) > 0 and len(spy) > 1:
         spy_growth = 100 * (spy.iloc[-1] / spy.iloc[0] - 1)
@@ -89,9 +92,11 @@ def render(final, entries, prices, links, updated, class_fund=None):
     out.append("</div>")
 
     out.append("<p class='note' style='font-size:15px'><b>Only final funds are here</b>: funds sent from the Studio 6 notebook, "
-               "<i>Your Final Fund</i>. Each one starts with $10,000 at the first market close after it was sent, and is held "
-               "until its manager sends a new version. The race ends at the market close on %s. "
-               "The Studio 5 funds are on their own tab.</p>" % RACE_ENDS)
+               "<i>Your Final Fund</i>. <b>The race starts at the opening bell on %s (9:30 AM Eastern)</b>: every final fund "
+               "sent before then starts together, with $10,000 at that morning's opening prices. You can change your fund "
+               "and send again before the bell, and the last one you send is the one that starts. A fund sent or changed "
+               "after the bell counts from the next market close. The race ends at the market close on %s. "
+               "The Studio 5 funds are on their own tab.</p>" % (RACE_STARTS, RACE_ENDS))
 
     if len(board) == 0 and len(pending) == 0:
         out.append("<h2>No final funds yet</h2><p class='note' style='font-size:15px'>Send yours from the last part of the "
@@ -111,7 +116,7 @@ def render(final, entries, prices, links, updated, class_fund=None):
                        "<td class='l theme'>the market, since the first final fund started</td><td>$%s</td><td>%s</td><td>–</td>"
                        "<td>%s</td><td>–</td><td>%s</td><td class='l'>–</td></tr>" % (
                            "{:,.0f}".format(spy_value), page.pct(spy_growth), page.plain_pct(spy_drop),
-                           html.escape(spy.index[0].strftime("%Y-%m-%d"))))
+                           html.escape(scoring.day_label(spy.index[0]))))
         # the class fund: the average of the class's Studio 5 funds, over the same days as the S&P 500 row
         class_row = None
         if len(class_path) > 0:
@@ -127,7 +132,7 @@ def render(final, entries, prices, links, updated, class_fund=None):
                          "<td class='l'><a href='holdings.html'>who holds what</a></td></tr>" % (
                              html.escape(str(class_fund["name"])), int(class_fund["members"]),
                              "{:,.0f}".format(class_value), page.pct(class_growth), minus, page.plain_pct(class_drop),
-                             html.escape(class_path.index[0].strftime("%Y-%m-%d"))))
+                             html.escape(scoring.day_label(class_path.index[0]))))
 
         # the two rows that are not ranked sit where their value puts them, best first
         unranked = []
@@ -147,17 +152,17 @@ def render(final, entries, prices, links, updated, class_fund=None):
                            int(r["rank"]), page.fund_name(r["nickname"], r["netid"], links), html.escape(str(r["theme"])),
                            "{:,.0f}".format(r["with_rules_value"]), page.pct(r["with_rules_growth_pct"]),
                            page.points(r["rules_minus_spy_pct"]), page.plain_pct(r["with_rules_worst_drop_pct"]),
-                           int(r["changes"]), html.escape(str(r["started"])), chips(mix, since)))
+                           int(r["changes"]), html.escape(scoring.day_label(r["started"])), chips(mix, since)))
         for pair in unranked:
             out.append(pair[1])
         out.append("</table></div>")
-        out.append("<p class='note'><b>Return since it started</b>: what the fund's $10,000 has done since its first close. "
+        out.append("<p class='note'><b>Return since it started</b>: what the fund's $10,000 has done since it started. "
                    "<b>Fund minus S&amp;P 500</b>: that return minus the S&amp;P 500's over the same days, in percentage points. "
                    "<b>Worst drop</b>: the biggest fall from a high point so far. Each stock shows its share of the fund%s. "
                    "The gray S&amp;P 500 row is not ranked.%s</p>" % (
                        " and its return since the race began, blue up and red down" if len(since) > 0 else "",
                        " The purple row is the <b>class fund</b>: the average of the class's Studio 5 funds, with $10,000 "
-                       "placed at the same close as the first final fund. It is not ranked either. Did your final fund "
+                       "placed at the same time as the first final fund. It is not ranked either. Did your final fund "
                        "beat the class?" if class_row is not None else ""))
 
         extras = []
@@ -166,22 +171,25 @@ def render(final, entries, prices, links, updated, class_fund=None):
         race = interactive.race_data(final["values"], board, final["benchmark_path"], extras)
         if race is not None:
             out.append("<h2>The race, day by day</h2><p class='note'>Click a fund to turn its line on or off. The black line is "
-                       "the S&amp;P 500%s.</p>" % (" and the purple line is the class fund" if len(class_path) > 0 else ""))
+                       "the S&amp;P 500%s.%s</p>" % (
+                           " and the purple line is the class fund" if len(class_path) > 0 else "",
+                           " The first point of each line is the opening bell on Monday, Nov 23. Every point after it "
+                           "is a market close." if race_start == scoring.RACE_OPEN_ROW else ""))
             out.append(interactive.block("finalrace", race, None, "Value of every final fund over time"))
 
     if len(pending) > 0:
-        out.append("<h2>Starting at the next market close</h2>")
-        out.append("<div class='tablebox'><table><tr><th class='l'>Fund</th><th class='l'>Strategy</th><th>Counts from the close on</th>"
+        out.append("<h2>Waiting to start</h2>")
+        out.append("<div class='tablebox'><table><tr><th class='l'>Fund</th><th class='l'>Strategy</th><th>Starts at</th>"
                    "<th class='l'>What it holds</th></tr>")
         for i in range(len(pending)):
             r = pending.loc[i]
             mix = latest[r["netid"]]["portfolios"]["with_rules"] if r["netid"] in latest else {}
             out.append("<tr><td class='l fund'>%s</td><td class='l theme'>%s</td><td>%s</td><td class='holds'>%s</td></tr>" % (
                 page.fund_name(r["nickname"], r["netid"], links), html.escape(str(r["theme"])),
-                html.escape(str(r["starts"])), chips(mix, {})))
+                html.escape(str(r["starts_text"])), chips(mix, {})))
         out.append("</table></div>")
-        out.append("<p class='note'>These funds were sent after the last market close, so they start at the next one "
-                   "(4 PM Eastern on a weekday). They move into the race above the next morning.</p>")
+        out.append("<p class='note'>These funds have been sent and are waiting for their start. A fund that starts at the "
+                   "opening bell moves into the race above after that day's 4 PM close, with its first day's return.</p>")
 
     out.append("<p class='note'>Fund names only. Page last built %s.</p>" % html.escape(updated))
     out.append("</div></body></html>")
